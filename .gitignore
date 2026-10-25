@@ -218,3 +218,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Local certificates and private keys
+*.cer
+*.pem
+*.key
+
+# Local environment
+.env
+.env.*
+!.env.example
