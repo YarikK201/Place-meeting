@@ -1,102 +1,96 @@
-
 import asyncio
 import os
 from maxapi import Bot, Dispatcher
 from maxapi.filters.command import Command
-from maxapi.types import CallbackButton, LinkButton
+from maxapi.types import CallbackButton as B, LinkButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from catalog import connect
+import filters as flt
+import favorites as fav
 
-bot = Bot(os.environ["MAX_BOT_TOKEN"])
+bot = Bot(os.environ['MAX_BOT_TOKEN'])
 dp = Dispatcher()
+fav.init()
 
-def tags():
-    with connect() as db:
-        return [r[0] for r in db.execute("""
-            SELECT DISTINCT value FROM events, json_each(events.tags)
-            ORDER BY value
-        """)]
 
-def keyboard(buttons):
+def keyboard(rows):
     kb = InlineKeyboardBuilder()
-    for row in buttons:
-        kb.row(*row)
+    for row in rows:
+        if row:
+            kb.row(*row)
     return [kb.as_markup()]
 
-def filters(page=0):
-    all_tags = tags()
-    buttons = [
-        [CallbackButton(text=t, payload=f"pick:{i}")]
-        for i, t in enumerate(all_tags[page*8:page*8+8], page*8)
-    ]
-    nav = []
-    if page > 0:
-        nav.append(CallbackButton(text="⬅", payload=f"filters:{page-1}"))
-    if (page+1)*8 < len(all_tags):
-        nav.append(CallbackButton(text="➡", payload=f"filters:{page+1}"))
-    if nav:
-        buttons.append(nav)
-    buttons.append([CallbackButton(text="Все мероприятия", payload="card:-1:0")])
-    return "Выбери интересующую категорию:", keyboard(buttons)
 
-def card(tag_id, i):
-    all_tags = tags()
-    tag = all_tags[tag_id] if tag_id >= 0 else None
-
+def card(tag_id, i, user_id, mode='card'):
     with connect() as db:
-        sql = "FROM events e WHERE (? IS NULL OR EXISTS (SELECT 1 FROM json_each(e.tags) WHERE value = ?))"
-        args = (tag, tag)
-        total = db.execute("SELECT COUNT(*) " + sql, args).fetchone()[0]
+        if mode == 'favorite':
+            saved_ids = fav.ids(user_id)
+            total = len(saved_ids)
+            if not total:
+                return 'В избранном пока нет мероприятий.', keyboard([
+                    [B(text='Каталог', payload='card:-1:0')],
+                    [B(text='Фильтры', payload='filters:0')]])
+            i = min(max(i, 0), total-1)
+            e = db.execute('SELECT * FROM events WHERE id=?', (saved_ids[i],)).fetchone()
+        else:
+            e, total, i = flt.events(tag_id, i)
+            if not total:
+                return 'По фильтру мероприятий нет.', keyboard([
+                    [B(text='Фильтры', payload='filters:0')]])
 
-        if not total:
-            return "По этому фильтру мероприятий нет.", keyboard([
-                [CallbackButton(text="Фильтры", payload="filters:0")]
-            ])
-
-        i = max(0, min(i, total-1))
-        e = db.execute("SELECT e.* " + sql + " ORDER BY e.date, e.id LIMIT 1 OFFSET ?", (*args, i)).fetchone()
-
-    text = (f"📅 {e['title']}\n\n"
-            f"🕒 {e['date'] or 'Не указана'}\n"
-            f"📍 {e['place'] or 'Не указано'}\n\n"
-            f"{e['description'] or ''}")
-
+    text = (f"{e['title']}\n\n {e['date'] or 'Не указана'}\n"
+            f"{e['place'] or 'Не указано'}\n\n{e['description'] or ''}")
+    key = f'{mode}:{tag_id}:{i}' if mode == 'card' else f'favorite:{i}'
     nav = []
-    if i > 0:
-        nav.append(CallbackButton(text="⬅ Назад", payload=f"card:{tag_id}:{i-1}"))
+    if i:
+        nav.append(B(text='⬅ Назад', payload=f'card:{tag_id}:{i-1}' if mode == 'card' else f'favorite:{i-1}'))
     if i < total-1:
-        nav.append(CallbackButton(text="Далее ➡", payload=f"card:{tag_id}:{i+1}"))
+        nav.append(B(text='Далее ➡', payload=f'card:{tag_id}:{i+1}' if mode == 'card' else f'favorite:{i+1}'))
+    liked = fav.saved(user_id, e['id'])
+    rows = [nav,
+            [B(text='Убрать из избранного' if liked else 'В избранное',
+               payload=f'toggle:{e["id"]}:{key}')],
+            [LinkButton(text='Подробнее ↗', url=e['url'])],
+            [B(text='Избранное', payload='favorite:0'),
+             B(text='Фильтры', payload='filters:0')]]
+    return text[:4000], keyboard(rows)
 
-    buttons = []
-    if nav:
-        buttons.append(nav)
-    buttons.append([LinkButton(text="Подробнее ↗", url=e["url"])])
-    buttons.append([CallbackButton(text="Фильтры", payload="filters:0")])
-    return text, keyboard(buttons)
 
-@dp.message_created(Command("filters"))
+@dp.message_created(Command('filters'))
 async def show_filters(event):
-    text, buttons = filters()
-    await event.message.answer(text=text, attachments=buttons)
+    text, kb = flt.menu()
+    await event.message.answer(text=text, attachments=kb)
 
-@dp.message_created(Command("start"))
-@dp.message_created(Command("catalog"))
+
+@dp.message_created(Command('start'))
+@dp.message_created(Command('catalog'))
 async def start(event):
-    text, buttons = card(-1, 0)
-    await event.message.answer(text=text, attachments=buttons)
+    text, kb = card(-1, 0, event.message.sender.user_id)
+    await event.message.answer(text=text, attachments=kb)
+
 
 @dp.message_callback()
 async def callback(event):
-    parts = event.callback.payload.split(":")
-
-    if parts[0] == "filters":
-        text, buttons = filters(int(parts[1]))
-    elif parts[0] == "pick":
-        text, buttons = card(int(parts[1]), 0)
+    parts = event.callback.payload.split(':')
+    action = parts[0]
+    user_id = event.callback.user.user_id
+    if action == 'toggle':
+        fav.toggle(user_id, int(parts[1]))
+        parts = parts[2:]
+        action = parts[0]
+    if action == 'filters':
+        text, kb = flt.menu(int(parts[1]))
+    elif action == 'pick':
+        text, kb = card(int(parts[1]), 0, user_id)
+    elif action == 'favorite':
+        text, kb = card(-1, int(parts[1]), user_id, 'favorite')
+    elif action == 'card':
+        text, kb = card(int(parts[1]), int(parts[2]), user_id)
     else:
-        text, buttons = card(int(parts[1]), int(parts[2]))
-
+        await event.answer()
+        return
     await event.answer()
-    await event.message.edit(text=text, attachments=buttons)
+    await event.message.edit(text=text, attachments=kb)
+
 
 asyncio.run(dp.start_polling(bot))
