@@ -20,7 +20,9 @@ def saved(user_id, event_id):
 
 def toggle(user_id, event_id):
     with connect() as db:
-        if saved(user_id, event_id):
+        exists = db.execute('SELECT 1 FROM favorites WHERE user_id=? AND event_id=?',
+                            (user_id, event_id)).fetchone()
+        if exists:
             db.execute('DELETE FROM favorites WHERE user_id=? AND event_id=?', (user_id, event_id))
         else:
             db.execute('INSERT OR IGNORE INTO favorites VALUES (?, ?)', (user_id, event_id))

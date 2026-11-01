@@ -21,7 +21,7 @@ RUN openssl x509 -inform DER -in /tmp/sub.cer \
 
 RUN update-ca-certificates
 
-COPY bot.py catalog.py filters.py favorites.py import_events.py events.json /app/
+COPY bot.py catalog.py filters.py favorites.py profiles.py people.py import_events.py events.json /app/
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
