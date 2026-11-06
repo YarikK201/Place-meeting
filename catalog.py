@@ -1,39 +1,45 @@
+"""SQLite: схема создаётся один раз на процесс, соединения всегда закрываются."""
 import os
 import sqlite3
+from threading import Lock
 
 PATH = os.getenv('EVENTS_DB', '/data/events_v2.db')
-_initialized = False
+_schema_ready = False
+_schema_lock = Lock()
+
+
+class ClosingConnection(sqlite3.Connection):
+    """Контекстный менеджер закрывает sqlite-соединение даже при ошибке."""
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
 
 
 def connect():
-    global _initialized
+    global _schema_ready
     os.makedirs(os.path.dirname(PATH) or '.', exist_ok=True)
-    db = sqlite3.connect(PATH)
+    db = sqlite3.connect(PATH, factory=ClosingConnection, timeout=3)
     db.row_factory = sqlite3.Row
-    if not _initialized:
-        db.executescript('''
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY,
-                url TEXT NOT NULL UNIQUE,
-                title TEXT NOT NULL,
-                description TEXT,
-                date TEXT,
-                place TEXT,
-                format TEXT,
-                tags TEXT,
-                status TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);
-            CREATE INDEX IF NOT EXISTS idx_events_place ON events(place);
-            CREATE INDEX IF NOT EXISTS idx_events_format ON events(format);
-        ''')
-        _initialized = True
-    return db
-
-
-def count(db):
-    return db.execute('SELECT COUNT(*) FROM events').fetchone()[0]
-
-
-def get(db, index):
-    return db.execute('SELECT * FROM events ORDER BY date, id LIMIT 1 OFFSET ?', (index,)).fetchone()
+    try:
+        if not _schema_ready:
+            with _schema_lock:
+                if not _schema_ready:
+                    db.execute('''CREATE TABLE IF NOT EXISTS events (
+                        id INTEGER PRIMARY KEY,
+                        url TEXT NOT NULL UNIQUE,
+                        title TEXT NOT NULL,
+                        description TEXT,
+                        date TEXT,
+                        place TEXT,
+                        format TEXT,
+                        tags TEXT,
+                        status TEXT
+                    )''')
+                    db.commit()
+                    _schema_ready = True
+        return db
+    except BaseException:
+        db.close()
+        raise

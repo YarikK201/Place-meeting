@@ -1,7 +1,22 @@
+# Git, настройки и файлы разработчиков
 .git
-.venv
-__pycache__
-data/
-*.db
-*.sqlite3
+.gitignore
 .env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.db-*
+*.log
+*.zip
+*backup*
+*before*
+test_*.py
+README*.md
+*.docx
+*.pdf
+.venv/
+venv/
+.idea/
+.vscode/

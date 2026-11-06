@@ -6,32 +6,25 @@ def init():
         db.execute('''CREATE TABLE IF NOT EXISTS favorites (
             user_id INTEGER NOT NULL,
             event_id INTEGER NOT NULL,
-            PRIMARY KEY (user_id, event_id)
+            PRIMARY KEY(user_id,event_id)
         )''')
 
 
-def saved(user_id, event_id):
+def saved(uid, eid):
     with connect() as db:
-        return db.execute(
-            'SELECT 1 FROM favorites WHERE user_id=? AND event_id=?',
-            (user_id, event_id)
-        ).fetchone() is not None
+        return db.execute('SELECT 1 FROM favorites WHERE user_id=? AND event_id=?', (uid,eid)).fetchone() is not None
 
 
-def toggle(user_id, event_id):
+def toggle(uid, eid):
     with connect() as db:
-        exists = db.execute('SELECT 1 FROM favorites WHERE user_id=? AND event_id=?',
-                            (user_id, event_id)).fetchone()
+        exists = db.execute('SELECT 1 FROM favorites WHERE user_id=? AND event_id=?', (uid,eid)).fetchone()
         if exists:
-            db.execute('DELETE FROM favorites WHERE user_id=? AND event_id=?', (user_id, event_id))
+            db.execute('DELETE FROM favorites WHERE user_id=? AND event_id=?', (uid,eid))
         else:
-            db.execute('INSERT OR IGNORE INTO favorites VALUES (?, ?)', (user_id, event_id))
+            db.execute('INSERT OR IGNORE INTO favorites VALUES (?,?)', (uid,eid))
 
 
-def ids(user_id):
+def ids(uid):
     with connect() as db:
-        return [r[0] for r in db.execute('''
-            SELECT f.event_id FROM favorites f
-            JOIN events e ON e.id=f.event_id
-            WHERE f.user_id=? ORDER BY e.date, e.id
-        ''', (user_id,))]
+        return [row[0] for row in db.execute('''SELECT f.event_id FROM favorites f
+            JOIN events e ON e.id=f.event_id WHERE f.user_id=? ORDER BY e.date,e.id''', (uid,))]
