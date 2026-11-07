@@ -99,8 +99,10 @@ def decide(mod_uid, request_id, approve, comment=''):
         db.execute('DELETE FROM conversations WHERE uid1=? OR uid2=?', (uid, uid))
         db.execute('DELETE FROM direct_messages WHERE sender=? OR recipient=?',(uid,uid))
         # Персональные блокировки и жалобы сохраняются ради безопасности.
-        db.execute('''UPDATE profiles SET role=?, bio='', city='', age=NULL,
-            interests='[]', skills='[]', waiting=1, teacher_status='unverified'
+        db.execute('DELETE FROM teacher_verification_drafts WHERE user_id=?', (uid,))
+        db.execute('''UPDATE profiles SET role=?, name='', bio='', city='', age=NULL,
+            interests='[]', skills='[]', waiting=1, teacher_status='unverified',
+            teacher_workplace='', teacher_position=''
             WHERE user_id=?''', (r['to_role'], uid))
         db.execute('DELETE FROM user_workflows WHERE user_id=?', (uid,))
         db.execute("UPDATE role_change_requests SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=?",

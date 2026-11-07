@@ -14,11 +14,14 @@ def init():
         for name, typ in [('name','TEXT DEFAULT \'\''),('city','TEXT DEFAULT \'\''),
                           ('age','INTEGER'),('interests','TEXT DEFAULT \'[]\''),
                           ('skills','TEXT DEFAULT \'[]\''),('stage','TEXT DEFAULT \'\''),
-                          ('teacher_status','TEXT DEFAULT \'unverified\'')]:
+                          ('teacher_status', "TEXT DEFAULT 'unverified'"),
+                          ('teacher_workplace', "TEXT DEFAULT ''"),
+                          ('teacher_position', "TEXT DEFAULT ''")]:
             if name not in names: db.execute(f'ALTER TABLE profiles ADD COLUMN {name} {typ}')
         db.execute('''CREATE TABLE IF NOT EXISTS user_workflows (
              user_id INTEGER PRIMARY KEY, stage TEXT NOT NULL DEFAULT '', data TEXT NOT NULL DEFAULT '{}'
         )''')
+        db.execute("UPDATE user_workflows SET stage='' WHERE stage='contact_link'")
 
 
 def get(uid):

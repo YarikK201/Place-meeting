@@ -7,16 +7,17 @@ from datetime import timedelta
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from catalog import connect
+from event_tags import normalize, ALL_TAGS
 
 FIELDS=['title','description','date','place','format','tags','url']
 QUESTIONS={
  'title':'Как называется мероприятие?',
  'description':'Коротко расскажите, что будет происходить.',
- 'date':'Когда пройдёт мероприятие? Укажите дату YYYY-MM-DD и время при необходимости.',
- 'place':'Где пройдёт мероприятие?',
+ 'date':'Когда пройдёт мероприятие? Укажите дату в формате ГГГГ-ММ-ДД и время при необходимости.',
+ 'place':'Где пройдёт главное мероприятие?',
  'format':'Это онлайн- или офлайн-мероприятие?',
- 'tags':'Какие темы подходят мероприятию? Укажите через запятую.',
- 'url':'Пришлите ссылку, где можно узнать подробности.'}
+ 'tags':'Какие темы подходят мероприятию? Выберите темы из списка.',
+ 'url':'Пришлите ссылку, где можно узнать подробности.\nК примеру, это может быть информационный пост в соцсети, сайт мероприятия или документ положения.'}
 
 def init():
     with connect() as db:
@@ -29,6 +30,14 @@ def init():
           created TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS moderator_users (user_id INTEGER PRIMARY KEY);
         ''')
+        db.execute('''CREATE TABLE IF NOT EXISTS teacher_verification_drafts (
+            user_id INTEGER PRIMARY KEY, full_name TEXT NOT NULL DEFAULT '',
+            workplace TEXT NOT NULL DEFAULT '', position TEXT NOT NULL DEFAULT ''
+        )''')
+        check_cols={r['name'] for r in db.execute('PRAGMA table_info(teacher_checks)')}
+        for field in ('full_name','workplace','position'):
+            if field not in check_cols:
+                db.execute(f"ALTER TABLE teacher_checks ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
         names={r['name'] for r in db.execute('PRAGMA table_info(proposed_events)')}
         if 'review_hash' not in names:
             db.execute("ALTER TABLE proposed_events ADD COLUMN review_hash TEXT DEFAULT ''")
@@ -80,12 +89,46 @@ def valid_url(url):
     u=urlparse(url)
     return u.scheme in ('http','https') and bool(u.netloc)
 
-def check_submit(uid,link):
-    if not valid_url(link): return False
+TEACHER_FIELDS = {'full_name': 'ФИО', 'workplace': 'Место работы', 'position': 'Должность'}
+
+
+def verification_draft(uid):
     with connect() as db:
-        db.execute('INSERT INTO teacher_checks(user_id,doc_url,created) VALUES (?,?,?)',
-                   (uid,link,datetime.now(timezone.utc).isoformat()))
-        db.execute("UPDATE profiles SET teacher_status='pending' WHERE user_id=? AND role='teacher'",(uid,))
+        db.execute('INSERT OR IGNORE INTO teacher_verification_drafts(user_id) VALUES (?)', (uid,))
+        return db.execute('SELECT * FROM teacher_verification_drafts WHERE user_id=?', (uid,)).fetchone()
+
+
+def save_verification_field(uid, field, value):
+    if field not in TEACHER_FIELDS:
+        return False
+    value = ' '.join(value.strip().split())
+    if not 2 <= len(value) <= 150:
+        return False
+    if field == 'full_name' and len(value.split()) < 2:
+        return False
+    with connect() as db:
+        profile = db.execute('SELECT role,teacher_status FROM profiles WHERE user_id=?', (uid,)).fetchone()
+        if not profile or profile['role'] != 'teacher' or profile['teacher_status'] in ('pending', 'approved'):
+            return False
+        db.execute('INSERT OR IGNORE INTO teacher_verification_drafts(user_id) VALUES (?)', (uid,))
+        db.execute(f'UPDATE teacher_verification_drafts SET {field}=? WHERE user_id=?', (value, uid))
+    return True
+
+
+def check_submit(uid, link):
+    if not valid_url(link) or len(link) > 2000:
+        return False
+    with connect() as db:
+        profile = db.execute('SELECT role,teacher_status FROM profiles WHERE user_id=?', (uid,)).fetchone()
+        draft = db.execute('SELECT * FROM teacher_verification_drafts WHERE user_id=?', (uid,)).fetchone()
+        if not profile or profile['role'] != 'teacher' or profile['teacher_status'] in ('pending', 'approved'):
+            return False
+        if not draft or not all(draft[f] for f in TEACHER_FIELDS):
+            return False
+        db.execute('''INSERT INTO teacher_checks(user_id,full_name,workplace,position,doc_url,created)
+            VALUES (?,?,?,?,?,?)''', (uid, draft['full_name'], draft['workplace'], draft['position'],
+                                     link, datetime.now(timezone.utc).isoformat()))
+        db.execute("UPDATE profiles SET teacher_status='pending' WHERE user_id=? AND role='teacher'", (uid,))
     return True
 
 def is_teacher(uid):
@@ -106,8 +149,18 @@ def decide_teacher(mod,id,approve,comment=''):
     with connect() as db:
         r=db.execute("SELECT * FROM teacher_checks WHERE id=? AND status='pending'",(id,)).fetchone()
         if not r: return None
-        db.execute('UPDATE teacher_checks SET status=?,comment=?,doc_url='' WHERE id=?',('approved' if approve else 'rejected',comment,id))
-        db.execute('UPDATE profiles SET teacher_status=? WHERE user_id=?',('approved' if approve else 'rejected',r['user_id']))
+        db.execute("UPDATE teacher_checks SET status=?, comment=?, doc_url='' WHERE id=?",
+                   ('approved' if approve else 'rejected', comment, id))
+        if approve:
+            # Подтверждённая заявка — единственный источник имени педагога в каталоге.
+            db.execute('''UPDATE profiles SET teacher_status='approved', name=?,
+                teacher_workplace=?, teacher_position=?, waiting=0 WHERE user_id=? AND role='teacher' ''',
+                (r['full_name'], r['workplace'], r['position'], r['user_id']))
+            db.execute('''INSERT INTO people_settings(user_id,visible) VALUES (?,1)
+                ON CONFLICT(user_id) DO UPDATE SET visible=1''', (r['user_id'],))
+            db.execute('DELETE FROM teacher_verification_drafts WHERE user_id=?', (r['user_id'],))
+        else:
+            db.execute("UPDATE profiles SET teacher_status='rejected' WHERE user_id=? AND role='teacher'", (r['user_id'],))
         return r['user_id']
 
 def draft(uid):
@@ -141,6 +194,8 @@ def send_review(uid):
     if not r: return False
     data=json.loads(r['draft'])
     if any(not data.get(f) for f in FIELDS) or not valid_url(data['url']):return False
+    if data.get('format') not in ('онлайн','офлайн') or not isinstance(data.get('tags'),list):return False
+    if not data['tags'] or any(tag not in ALL_TAGS for tag in data['tags']):return False
     digest=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     if r['review_hash']==digest:return False
     with connect() as db:
@@ -159,7 +214,7 @@ def decide_event(mod,id,approve,comment=''):
         data=json.loads(r['draft'])
         if approve:
             values=(data['url'],data['title'],data['description'],data['date'],data['place'],data['format'],
-                json.dumps(data['tags'] if isinstance(data['tags'],list) else [v.strip() for v in data['tags'].split(',')],ensure_ascii=False))
+                json.dumps(normalize(data['tags']),ensure_ascii=False))
             if r['event_id']:
                 db.execute('''UPDATE events SET url=?,title=?,description=?,date=?,place=?,format=?,tags=?,status='published'
                     WHERE id=?''',(*values,r['event_id']))

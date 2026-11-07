@@ -9,13 +9,10 @@ from zoneinfo import ZoneInfo
 from maxapi.types import CallbackButton as B
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from catalog import connect
+import event_tags as et
 
-GROUPS = {
-    'art': ('🎭 Виды искусства', 'Балет Выставки Драмы Комедии Спектакли Хореография Мюзиклы'.split()),
-    'music': ('🎵 Музыка', ['Джаз', 'Живая музыка', 'Классика', 'Концерты', 'Поп-музыка', 'Рок', 'Шансон', 'Хип-хоп', 'Народная музыка']),
-    'activity': ('✨ Активности', ['Лекции', 'Мастер-классы', 'Пешеходные экскурсии', 'Саморазвитие', 'Цирковое шоу', 'Шоу', 'Экскурсии', 'волонтёрство', 'Движение Первых'])
-}
-AGES = ['Детям до 3 лет'] + [f'Детям от {a} до {b} лет' for a, b in [(3,6),(7,11),(12,15),(16,18)]]
+GROUPS = {key: value for key, value in et.GROUPS.items() if key != 'age'}
+AGES = et.AGES
 AGE_NAMES = ['До 3 лет', '3–6 лет', '7–11 лет', '12–15 лет', '16–18 лет']
 PERIODS = [('Сегодня','today'), ('Завтра','tomorrow'), ('Эта неделя','week'),
            ('Выходные','weekend'), ('Следующие 7 дней','next7'),
@@ -53,13 +50,13 @@ def state(uid):
         return dict(topics=[], ages=[], city='', period='', format='')
     s = dict(row)
     for field in ('topics', 'ages'):
-        s[field] = json.loads(s[field])
+        s[field] = et.normalize(json.loads(s[field]))
     return s
 
 
 def update(uid, field, value):
     if field not in FIELDS: return
-    if isinstance(value, list): value = json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list): value = json.dumps(et.normalize(value), ensure_ascii=False)
     with connect() as db:
         db.execute('INSERT OR IGNORE INTO event_filters(user_id) VALUES (?)', (uid,))
         db.execute(f'UPDATE event_filters SET {field}=? WHERE user_id=?', (value,uid))
@@ -99,12 +96,19 @@ _available_at = [float('-inf')]
 _available_values = set()
 
 
+def period_label(value):
+    if not value:
+        return 'Не выбрана'
+    if re.fullmatch(r'20\d\d-\d\d-\d\d', value):
+        return date.fromisoformat(value).strftime('%d.%m.%Y')
+    return dict((key, name) for name, key in PERIODS).get(value, value)
+
 def screen(uid, view='home', param=None):
     s = state(uid)
     if view == 'home':
         def shown(items, default): return ', '.join(items[:2])+(' +'+str(len(items)-2) if len(items)>2 else '') if items else default
         age_names = [AGE_NAMES[AGES.index(x)] for x in s['ages'] if x in AGES]
-        date_name = dict((v,k) for k,v in PERIODS).get(s['period'],s['period'] or 'Любая')
+        date_name = period_label(s['period']) if s['period'] else 'Любая'
         text = ('🔎 Настроим поиск!\nВыбери нужные параметры.\n\nСейчас выбрано:\n'
                 f'🎭 Тематика: {shown(s["topics"],"Любая")}\n🎂 Возраст: {shown(age_names,"Любой")}\n'
                 f'📍 Место: {s["city"] or "Весь Кузбасс"}\n📅 Дата: {date_name}\n🌐 Формат: {s["format"] or "Любой"}')
@@ -117,17 +121,21 @@ def screen(uid, view='home', param=None):
             [[btn('✅ Готово','home'),btn('✕ Очистить','clear:topics')],[btn('◀ Назад','home')]])
     if view == 'group':
         title,names=GROUPS[param]; valid=available()
-        entries=[(name,name,f'tag:{param}:{i}') for i,name in enumerate(names) if name in valid]
+        entries=[(name,name,f'tag:{param}:{i}') for i,name in enumerate(names)]
         return options(title,entries,s['topics'],'topic')
     if view == 'age':
-        valid=available(); entries=[(AGE_NAMES[i],name,f'agepick:{i}') for i,name in enumerate(AGES) if name in valid]
+        entries=[(AGE_NAMES[i],name,f'agepick:{i}') for i,name in enumerate(AGES)]
         return options('🎂 Для какого возраста ищем?',entries,s['ages'],clear='ages')
     if view in ('city','other'):
         indices = range(4,7) if view=='other' else range(4)
         entries=[(CITIES[i], CITIES[i] if i!=3 else '',f'citypick:{i}') for i in indices]
         return options('📍 Где ищем?', entries,[s['city']], 'city' if view=='other' else 'home')
     if view == 'date':
-        return options('📅 Когда хочешь пойти?',[(a,b,'datepick:'+b) for a,b in PERIODS],[s['period']],clear='period')
+        # Для даты выбирается только один вариант, поэтому галочки не нужны.
+        choices = [btn(name, 'datepick:' + value) for name, value in PERIODS]
+        return (f'📅 Когда хочешь пойти?\nВыбранная дата: {period_label(s["period"])}',
+                kb(rows2(choices) + [[btn('✕ Сбросить дату', 'clear:period')],
+                                     [btn('◀ Назад', 'home')]]))
     if view == 'format':
         entries=[('🏫 Лично','офлайн','formatpick:офлайн'),('💻 Онлайн','онлайн','formatpick:онлайн'),
                  ('🌍 Любой формат','','formatpick:any')]
@@ -176,13 +184,15 @@ def city(place):
 
 @lru_cache(maxsize=4096)
 def parsed_tags(tags):
-    return frozenset(json.loads(tags or '[]'))
+    return frozenset(et.normalize(tags))
 
 def matches(e,s):
     if e['status']=='hidden': return False
     tags=parsed_tags(e['tags'] or '[]')
-    if s['topics'] and tags.isdisjoint(s['topics']): return False
-    if s['ages'] and tags.isdisjoint(s['ages']): return False
+    # Если выбраны теги, достаточно совпадения хотя бы с одним из них.
+    # Остальные совпадения учитываются при сортировке результатов.
+    if (s['topics'] or s['ages']) and tags.isdisjoint(s['topics'] + s['ages']):
+        return False
     if s['city'] and city(e['place'])!=s['city']: return False
     if s['format'] and (e['format'] or '').lower()!=s['format']: return False
     start,end=dates(e['date'] or '')
@@ -216,18 +226,30 @@ def all_events():
         _result_cache.clear()
     return _events_cache
 
+def tag_score(event, selected_tags):
+    """Сколько выбранных тегов совпало с тегами мероприятия."""
+    return len(parsed_tags(event['tags'] or '[]').intersection(selected_tags))
+
+
 def results(uid=None):
-    s = state(uid) if uid is not None else dict(topics=[],ages=[],city='',period='',format='')
+    s = state(uid) if uid is not None else dict(topics=[], ages=[], city='', period='', format='')
     events = all_events()
-    key = (uid, tuple(s['topics']), tuple(s['ages']), s['city'], s['period'], s['format'], _cache_epoch[0], today())
+    key = (uid, tuple(s['topics']), tuple(s['ages']), s['city'], s['period'],
+           s['format'], _cache_epoch[0], today())
     if key not in _result_cache:
-        found = [e for e in events if matches(e,s)]
-        _result_cache[key] = sorted(found, key=lambda e:(dates(e['date'] or '')[0] is None,
-            dates(e['date'] or '')[0] or date.max,e['id']))
-        if len(_result_cache) > 512:
+        selected_tags = set(s['topics'] + s['ages'])
+        found = [e for e in events if matches(e, s)]
+        # Сначала мероприятия с максимальным числом совпавших тегов.
+        # При одинаковом числе совпадений — ближайшие по дате.
+        found.sort(key=lambda e: (
+            -tag_score(e, selected_tags),
+            dates(e['date'] or '')[0] is None,
+            dates(e['date'] or '')[0] or date.max,
+            e['id'],
+        ))
+        if len(_result_cache) >= 512:
             _result_cache.clear()
-            _result_cache[key] = sorted(found, key=lambda e:(dates(e['date'] or '')[0] is None,
-                dates(e['date'] or '')[0] or date.max,e['id']))
+        _result_cache[key] = found
     return _result_cache[key]
 
 def results_unfiltered(): return results()
@@ -255,7 +277,7 @@ def handle(uid,parts):
         update(uid,'city','' if i==3 else CITIES[i]);return screen(uid)
     if a=='datepick':
         if parts[2]=='choose': return ('📆 Введите дату в формате ДД.ММ.ГГ (например, 06.07.27)',kb([[btn('◀ Назад','date')]]))
-        update(uid,'period',parts[2]);return screen(uid,'date')
+        update(uid,'period',parts[2]);return screen(uid,'home')
     if a=='formatpick':
         update(uid,'format','' if parts[2]=='any' else parts[2]);return screen(uid)
     if a=='year': return screen(uid,'month',parts[2])

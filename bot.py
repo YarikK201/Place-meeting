@@ -9,6 +9,7 @@ from maxapi.types import Command, CallbackButton as B, LinkButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from catalog import connect
 import profiles, people, social, teacher_events as te, filters as flt, favorites as fav, role_requests as rr, direct_messages as dm
+import event_tags as et
 
 bot = Bot(os.environ['MAX_BOT_TOKEN'])
 dp = Dispatcher()
@@ -18,6 +19,125 @@ for module in (profiles, social, people, te, flt, fav, rr, dm):
     module.init()
 # Только оперативная память: обычная переписка не сохраняется в SQLite.
 RECENT_MESSAGES = defaultdict(lambda: deque(maxlen=10))
+
+# У каждого пользователя одно рабочее сообщение с кнопками.
+# ID сохраняется в SQLite, поэтому перезапуск бота не создаёт новое окно.
+with connect() as db:
+    db.execute('''CREATE TABLE IF NOT EXISTS ui_messages (
+        user_id INTEGER PRIMARY KEY,
+        message_id TEXT NOT NULL
+    )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS old_ui_messages (
+        user_id INTEGER NOT NULL,
+        message_id TEXT NOT NULL,
+        PRIMARY KEY (user_id, message_id)
+    )''')
+
+_SCREEN_LOCKS = defaultdict(asyncio.Lock)
+
+
+def screen_id(uid):
+    with connect() as db:
+        row = db.execute('SELECT message_id FROM ui_messages WHERE user_id=?', (uid,)).fetchone()
+    return row['message_id'] if row else None
+
+
+def remember_screen(uid, mid):
+    if not mid:
+        return
+    with connect() as db:
+        old = db.execute('SELECT message_id FROM ui_messages WHERE user_id=?',
+                         (uid,)).fetchone()
+        if old and old['message_id'] != mid:
+            # Старое рабочее сообщение больше не нужно.
+            db.execute('INSERT OR IGNORE INTO old_ui_messages VALUES (?, ?)',
+                       (uid, old['message_id']))
+        db.execute("""INSERT INTO ui_messages(user_id, message_id) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET message_id=excluded.message_id""",
+            (uid, mid))
+        db.execute('DELETE FROM old_ui_messages WHERE user_id=? AND message_id=?',
+                   (uid, mid))
+
+
+async def remove_old_screens(uid):
+    """Удаляет только старые рабочие экраны, ID которых сохранил бот."""
+    with connect() as db:
+        old_messages = db.execute(
+            'SELECT message_id FROM old_ui_messages WHERE user_id=? LIMIT 10',
+            (uid,)).fetchall()
+    current = screen_id(uid)
+    for row in old_messages:
+        mid = row['message_id']
+        if mid == current:
+            continue
+        try:
+            result = await bot.delete_message(message_id=mid)
+            if result is not None and getattr(result, 'success', True) is False:
+                continue
+        except Exception as error:
+            # Удалённые вручную сообщения MAX может возвращать как 404.
+            # Остальные ошибки оставляем для следующей попытки.
+            if not any(x in str(error).lower() for x in ('404', 'not found', 'not_found')):
+                continue
+        with connect() as db:
+            db.execute('DELETE FROM old_ui_messages WHERE user_id=? AND message_id=?',
+                       (uid, mid))
+        # MAX ограничивает частоту удаления сообщений в одном диалоге.
+        await asyncio.sleep(0.55)
+
+
+def sent_id(result):
+    # maxapi возвращает SendedMessage с полем message.body.mid.
+    message = getattr(result, 'message', None)
+    body = getattr(message, 'body', None)
+    return getattr(body, 'mid', None)
+
+
+async def show_screen(uid, text, attachments=None, callback_message=None, force_new=False):
+    # Один рабочий экран на человека. Другие экраны из нашего списка удаляем.
+    async with _SCREEN_LOCKS[uid]:
+        mid = screen_id(uid)
+        callback_mid = getattr(getattr(callback_message, 'body', None), 'mid', None)
+        if not mid and callback_mid:
+            mid = callback_mid
+            remember_screen(uid, mid)
+
+        # Команда /start (и другие текстовые команды) должна показать экран
+        # в конце чата. Если редактировать старое сообщение, пользователь
+        # может не заметить ответ — экран останется далеко выше.
+        if mid and not force_new:
+            try:
+                result = await bot.edit_message(
+                    message_id=mid, text=text[:3999],
+                    attachments=attachments if attachments is not None else [],
+                    notify=False)
+                # API иногда возвращает success=false без исключения.
+                if result is not None and getattr(result, 'success', True) is False:
+                    raise RuntimeError('MAX не смог отредактировать рабочий экран')
+                await remove_old_screens(uid)
+                return result
+            except Exception as error:
+                # Если сообщение удалили вручную, создаём новый экран.
+                # При сетевых ошибках не создаём дубликаты.
+                reason = str(error).lower()
+                if not any(word in reason for word in (
+                    '404', '403', 'not found', 'not_found',
+                    'message.not.found', 'message.not_found',
+                    'message_not_found', 'not accessible', 'forbidden',
+                )):
+                    raise
+
+        sent = await bot.send_message(
+            user_id=uid, text=text[:3999], attachments=attachments)
+        new_mid = sent_id(sent)
+        if not new_mid:
+            # Ответ уже отправлен. Не падаем и не блокируем /start,
+            # даже если библиотека изменила формат ответа.
+            print('Предупреждение: MAX не вернул ID сообщения, экран нельзя сохранить')
+            return sent
+        remember_screen(uid, new_mid)
+        await remove_old_screens(uid)
+        return sent
 
 
 def keyboard(rows):
@@ -49,21 +169,30 @@ def name(uid):
     return profile['name'] if profile and profile['name'] else 'Участник'
 
 def ready(uid):
+    p=me(uid)
+    if p and p['role']=='teacher':
+        return te.is_teacher(uid) and not social.banned(uid)
     s=people.settings(uid)
     return bool(s and s['visible'] and profiles.complete(uid) and not social.banned(uid))
+
+def profile_button(uid):
+    # Роль уже выбрана, но анкета может быть заполнена не до конца.
+    return b('✏️ Изменить анкету' if profiles.complete(uid) else '✏️ Заполнить анкету', 'profile')
+
 
 def menu(uid):
     p=me(uid)
     if p and p['role']=='teacher':
         rows=[[b('📅 Мероприятия','card:0'),b('👥 Найти участников','p:student:0')],
               [b('➕ Добавить мероприятие','te:new'),b('🗂 Мои мероприятия','te:mine')],
-              [b('📩 Отправленные сообщения','dm:sent:0')],
-              [b('👤 Моя анкета','profile')]]
+              [b('📩 Отправленные сообщения','dm:sent:0')]]
         if p['teacher_status']!='approved': rows.insert(0,[b('👩‍🏫 Подтвердить статус','te:check')])
     else:
         rows=[[b('🎯 Мероприятия','card:0'),b('⭐ Избранное','favorite:0')],
-              [b('👥 Найти людей','p:student:0'),b('👤 Моя анкета','profile')],
-              [b('📩 Заявки','req:in:0'),b('🤝 Друзья','friend:0')]]
+              [b('👥 Найти людей','p:student:0'),profile_button(uid)],
+              [b('🤝 Друзья','friend:0')]]
+        if social.pending(uid, True) or social.pending(uid, False):
+            rows.insert(-1,[b('📩 Заявки','req:in:0')])
     if te.is_moderator(uid): rows.append([b('🛡 Модерация','mod:home')])
     # Смену роли можно запросить через повторный /start.
     rows.append([b('🔄 Сменить роль','role:change')])
@@ -85,22 +214,27 @@ def role_screen(uid):
 
 def profile_screen(uid):
     p=me(uid)
+    if p and p['role']=='teacher':
+        return teacher_screen(uid)
     if not p: return ui('👤 Моя анкета\nТы ещё не рассказал о себе. Заполни анкету, чтобы находить единомышленников.',[
-        [b('✏ Создать анкету','role:select')],home_btn()])
+        [b('✏️ Заполнить анкету','role:select')],home_btn()])
+    if not profiles.complete(uid):
+        return ui('👤 Анкета ещё не заполнена. Добавь город, возраст, интересы и навыки.', [
+            [b('✏️ Заполнить анкету','profile:edit')], home_btn()])
     visible=bool(people.settings(uid) and people.settings(uid)['visible'])
     text=people.card_text(p)+'\n\n'+('✅ Анкета опубликована.' if visible else '🔒 Анкета скрыта.')
     if p['role']=='teacher':text+='\n👩‍🏫 Проверка: '+p['teacher_status']
     return ui(text,[
         [b('🔒 Скрыть анкету','profile:hideconfirm') if visible else b('✅ Опубликовать','profile:publishconfirm')],
-        [b('✏ Изменить','profile:edit'),b('🗑 Удалить','profile:deleteconfirm')],
-        [b('🔗 Ссылка MAX','profile:link')],home_btn()])
+        [b('✏️ Изменить анкету','profile:edit'),b('🗑 Удалить','profile:deleteconfirm')],
+        home_btn()])
 
 
 def edit_menu():
     return ui('✏ Что хочешь изменить?',[
         [b('📍 Город','profile:field:city'),b('🎂 Возраст','profile:field:age')],
         [b('💡 Интересы','profile:field:interests'),b('🛠 Навыки','profile:field:skills')],
-        [b('👤 Моя анкета','profile')]])
+        [b('◀ Назад', 'profile')]])
 
 
 def tags_screen(uid,kind,group_index=-1):
@@ -155,8 +289,10 @@ def people_screen(uid,role='student',index=0):
     if current and current['role']=='teacher' and not te.is_teacher(uid):
         return teacher_screen(uid)
     if not ready(uid):
+        if current and current['role']=='teacher':
+            return teacher_screen(uid)
         return ui('👥 Давай найдём единомышленников! Сначала заполни и опубликуй свою анкету. Контакты другим пользователям не показываем.',[
-            [b('👤 Моя анкета','profile')],home_btn()])
+            [profile_button(uid)],home_btn()])
     found=people.list_people(uid,role)
     if not found:return ui('👥 Пока никого не нашли. Попробуй изменить возраст, интересы или навыки.',[
         [b('⚙ Фильтры','p:filters'),b('👩‍🏫 Педагоги' if role=='student' else '🎒 Школьники',f'p:{"teacher" if role=="student" else "student"}:0')],home_btn()])
@@ -220,17 +356,33 @@ def sent_screen(uid,index=0):
         nav,home_btn()])
 
 
+def request_tabs(uid):
+    """Показываем только направления с активными заявками."""
+    tabs=[]
+    if social.pending(uid, True):
+        tabs.append(b('📥 Входящие', 'req:in:0'))
+    if social.pending(uid, False):
+        tabs.append(b('📤 Отправленные', 'req:out:0'))
+    return [tabs] if tabs else []
+
+
 def req_screen(uid,which='in',index=0):
     found=social.pending(uid,which=='in')
-    if not found:return ui('📩 Новых заявок пока нет. Когда кто-нибудь захочет познакомиться, приглашение появится здесь.',[
-        [b('📥 Входящие','req:in:0'),b('📤 Отправленные','req:out:0')],home_btn()])
+    if not found:
+        other='out' if which=='in' else 'in'
+        if social.pending(uid,other):
+            return req_screen(uid,other,0)
+        return ui('📩 Активных заявок пока нет. Когда появятся новые, здесь будут доступны нужные разделы.',[home_btn()])
     index=max(0,min(index,len(found)-1));r=found[index];peer=r['sender'] if which=='in' else r['recipient']
     text=f'📩 Заявка {index+1}/{len(found)}\n👤 {r["name"] or "Участник"}\n📍 {r["city"]}\n🎂 {r["age"] or "?"}\n💡 {", ".join(json.loads(r["interests"] or "[]"))}'
-    rows=[[b('✅ Принять',f'req:accept:{peer}') ,b('✕ Отклонить',f'req:reject:{peer}')]] if which=='in' else [[b('✕ Отменить заявку',f'req:cancel:{peer}')]]
+    rows=[[b('✅ Принять',f'req:accept:{peer}'),b('✕ Отклонить',f'req:reject:{peer}')]] if which=='in' else [[b('✕ Отменить заявку',f'req:cancel:{peer}')]]
     nav=[]
     if index:nav.append(b('◀ Назад',f'req:{which}:{index-1}'))
     if index<len(found)-1:nav.append(b('Далее ▶',f'req:{which}:{index+1}'))
-    return ui(text,rows+[nav,[b('📥 Входящие','req:in:0'),b('📤 Отправленные','req:out:0')],home_btn()])
+    if nav: rows.append(nav)
+    rows+=request_tabs(uid)
+    rows.append(home_btn())
+    return ui(text,rows)
 
 
 def friends_screen(uid,index=0):
@@ -255,20 +407,106 @@ def teacher_screen(uid):
     p=me(uid)
     if not p or p['role']!='teacher':return ui('Доступно только педагогам.',[home_btn()])
     status=p['teacher_status']
-    if status=='approved':return ui('✅ Ваш статус педагога подтверждён.',[home_btn()])
+    if status=='approved':
+        return ui(f'✅ Статус педагога подтверждён.\nФИО: {p["name"]}\nМесто работы: {p["teacher_workplace"]}\nДолжность: {p["teacher_position"]}', [home_btn()])
     if status=='pending':return ui('⏳ Заявка получена! Модератор проверит документ.',[[b('🎯 Мероприятия','card:0')],home_btn()])
-    return ui('👩‍🏫 Для публикации мероприятий нужно подтвердить работу в образовательной организации.\nПришли ссылку на документ — его увидят только модераторы.',[
-        [b('✅ Пройти проверку','te:checkstart')],home_btn()])
+    draft=te.verification_draft(uid)
+    rows=[[b('✏️ ФИО','te:verify:full_name')],
+          [b('✏️ Место работы','te:verify:workplace')],
+          [b('✏️ Должность','te:verify:position')]]
+    if all(draft[f] for f in te.TEACHER_FIELDS):
+        rows.append([b('📄 Отправить документ','te:verify:doc')])
+    else:
+        first=next(f for f in te.TEACHER_FIELDS if not draft[f])
+        rows.append([b('▶ Продолжить заполнение',f'te:verify:{first}')])
+    rows.append(home_btn())
+    text=('👩‍🏫 Верификация педагога\n\n'
+          f'ФИО: {draft["full_name"] or "Не заполнено"}\n'
+          f'Место работы: {draft["workplace"] or "Не заполнено"}\n'
+          f'Должность: {draft["position"] or "Не заполнено"}\n\n'
+          'Заполни данные, затем отправь ссылку на документ. Заявку увидят модераторы.')
+    if status=='rejected':text='✕ Предыдущая заявка отклонена. Данные можно исправить и отправить заново.\n\n'+text
+    return ui(text,rows)
 
 
-def draft_screen(uid):
-    r=te.draft(uid)
-    if not r:return ui('Нет текущего черновика.',[[b('➕ Новый','te:new')],home_btn()])
-    data=json.loads(r['draft'])
-    text='➕ Новое мероприятие\n\n'+'\n'.join(f'{k}: {data.get(k,"—")}' for k in te.FIELDS)
-    return ui(text,[
-        [b('✏ '+field,f'te:field:{field}')] for field in te.FIELDS]+
-        [[b('✅ Отправить на проверку','te:send')],home_btn()])
+EVENT_LABELS = {
+    'title':'Название', 'description':'Описание', 'date':'Дата',
+    'place':'Место', 'format':'Формат', 'tags':'Тематика', 'url':'Ссылка'
+}
+EVENT_STEPS = list(te.FIELDS)
+
+
+def event_data(uid):
+    row=te.draft(uid)
+    return json.loads(row['draft']) if row else {}
+
+
+def event_card_text(uid):
+    data=event_data(uid)
+    return '\n'.join(f'{EVENT_LABELS[field]}: {", ".join(data[field]) if isinstance(data.get(field), list) else data.get(field) or "—"}' for field in EVENT_STEPS)
+
+
+def event_topic_screen(uid, edit=False, group=None):
+    """Выбор тем кнопками, как в фильтрах мероприятий."""
+    data = event_data(uid)
+    selected = et.normalize(data.get('tags', []))
+    mode = 'edit' if edit else 'new'
+    done = b('✅ Готово', f'te:topicdone:{mode}')
+    if group is None:
+        buttons = [[b(title, f'te:topicgroup:{mode}:{key}')]
+                   for key, (title, _) in et.GROUPS.items()]
+        return ui('🎭 Какие темы подходят мероприятию?\n'
+                  f'Выбрано: {", ".join(selected) or "Пока ничего"}\n'
+                  'Выберите одну или несколько тем из категорий.',
+                  buttons + [[done], [b('◀️ Назад', 'te:edit' if edit else 'te:draft')]])
+    if group not in et.GROUPS:
+        return event_topic_screen(uid, edit)
+    title, names = et.GROUPS[group]
+    buttons = [[b(('✓ ' if tag in selected else '') + tag,
+                  f'te:topictoggle:{mode}:{group}:{i}')]
+               for i, tag in enumerate(names)]
+    return ui(f'{title}\nВыбрано: {", ".join(selected) or "Пока ничего"}',
+              buttons + [[b('◀️ К категориям', f'te:topicgroups:{mode}'), done]])
+
+
+def event_prompt(uid,field,edit=False):
+    if field not in EVENT_STEPS: return draft_screen(uid)
+    if field == 'tags':
+        profiles.set_stage(uid, '')
+        return event_topic_screen(uid, edit)
+    if field == 'format':
+        profiles.set_stage(uid, '')
+        current = event_data(uid).get('format')
+        return ui(te.QUESTIONS['format'] + '\nВыбрано: ' + (current or 'Не выбрано'), [
+            [b('🏫 Офлайн',f'te:format:{"edit" if edit else "new"}:офлайн'),
+             b('💻 Онлайн',f'te:format:{"edit" if edit else "new"}:онлайн')],
+            [b('◀️ Назад','te:edit' if edit else 'te:draft')]])
+    profiles.set_stage(uid,('eventedit_' if edit else 'event_')+field)
+    return ui(te.QUESTIONS[field],[[b('◀️ Назад','te:edit' if edit else 'te:draft')]])
+
+
+def draft_screen(uid,mode='auto'):
+    if not te.draft(uid):return ui('Нет текущего черновика.',[[b('➕ Новое мероприятие','te:new')],home_btn()])
+    data=event_data(uid)
+    if mode=='edit':
+        return ui(event_card_text(uid)+'\n\nЧто Вы бы хотели изменить?',[
+            [b('Название','te:editfield:title'),b('Описание','te:editfield:description')],
+            [b('Дату','te:editfield:date'),b('Место','te:editfield:place')],
+            [b('Формат','te:editfield:format'),b('Тематику','te:editfield:tags')],
+            [b('Ссылку','te:editfield:url')],
+            [b('◀️ Назад','te:draft'),b('✅Готово','te:draft')]])
+    missing=next((field for field in EVENT_STEPS if not data.get(field)), None)
+    if missing and mode!='preview':
+        return ui('➕ Новое мероприятие\n\nРасскажите о событии, которое Вы хотите разместить.\n'
+                  'Пойдём по шагам — после заполнения можно будет проверить всё перед отправкой.\n\n'
+                  +te.QUESTIONS[missing],[
+                  [b('▶️ Продолжить',f'te:field:{missing}')],
+                  [b('✏️ Изменить','te:edit')],home_btn()])
+    return ui('✅ Всё заполнено!\nПроверьте информацию о мероприятии.\n'
+              'Если всё верно, можете отправить карточку на проверку.\n\n'+event_card_text(uid),[
+                  [b('✅ Отправить на проверку','te:send')],
+                  [b('✏️ Изменить','te:edit')],
+                  [b('◀️ Назад','home')]])
 
 
 def mod_screen(uid,which='home'):
@@ -293,7 +531,10 @@ def mod_screen(uid,which='home'):
         found=te.pending_teachers()
         if not found:return ui('Больше заявок нет.',[[b('◀ Назад','mod:home')]])
         r=found[0]
-        return ui(f'👩‍🏫 Заявка №{r["id"]}\nСсылка: {r["doc_url"]}',[
+        return ui(f'👩‍🏫 Заявка №{r["id"]}\nФИО: {r["full_name"] or "Не указано"}\n'
+                  f'Место работы: {r["workplace"] or "Не указано"}\n'
+                  f'Должность: {r["position"] or "Не указано"}\n'
+                  f'Ссылка на документ: {r["doc_url"]}',[
             [b('✅ Подтвердить',f'mod:teacherok:{r["id"]}'),b('✕ Отклонить',f'mod:teacherreject:{r["id"]}')],
             [b('◀ Назад','mod:home')]])
     if which=='events':
@@ -344,27 +585,27 @@ async def start(event):
     text,attachments=role_screen(uid)
     if social.partner(uid): text,attachments=ui('💬 У тебя есть активный разговор. Хочешь продолжить или завершить его?',[
         [b('💬 Продолжить','chat:screen'),b('✕ Завершить','chat:endconfirm')],home_btn()])
-    await event.message.answer(text=text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('catalog'))
 async def catalog_cmd(event):
     text,attachments=event_card(0,event.message.sender.user_id)
-    await event.message.answer(text=text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('people'))
 async def people_cmd(event):
     text,attachments=people_screen(event.message.sender.user_id)
-    await event.message.answer(text=text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('profile'))
 async def profile_cmd(event):
     text,attachments=profile_screen(event.message.sender.user_id)
-    await event.message.answer(text=text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('filters'))
 async def filters_cmd(event):
     text,attachments=flt.screen(event.message.sender.user_id)
-    await event.message.answer(text=text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('moderator'))
 async def moderator_cmd(event):
@@ -378,7 +619,7 @@ async def moderator_cmd(event):
         text, attachments = ui('🛡 Вход в модерацию\n\nОтправь секретный код следующим сообщением.\n'
                                'Не пересылай код другим пользователям.',
                                [[b('✕ Отмена','mod:cancel_login')], home_btn()])
-    await event.message.answer(text=text, attachments=attachments)
+    await show_screen(event.message.sender.user_id, text=text, attachments=attachments,force_new=True)
 
 
 @dp.message_created(Command('moderator_logout'))
@@ -387,13 +628,18 @@ async def moderator_logout_cmd(event):
     te.logout_moderator(uid)
     profiles.set_stage(uid, '')
     text, attachments = menu(uid)
-    await event.message.answer(text='🚪 Вы вышли из режима модератора.\n\n' + text,
-                               attachments=attachments)
+    await show_screen(event.message.sender.user_id, text='🚪 Вы вышли из режима модератора.\n\n' + text,
+                               attachments=attachments,force_new=True)
 
 @dp.message_callback()
 async def callback(event):
     uid = event.callback.user.user_id
     parts = (event.callback.payload or '').split(':')
+    # Во время ввода причины отказа старые кнопки одобрения/отказа не действуют.
+    stage = profiles.stage(uid)
+    if stage and stage.startswith('modteacher_') and parts[:2] in (["mod","teacherok"],["mod","teacherreject"]):
+        await event.answer()
+        return
 
     # Подтверждаем нажатие и обновляем карточку одновременно.
     answer_task = asyncio.create_task(event.answer())
@@ -401,7 +647,7 @@ async def callback(event):
         text, attachments = await dispatch(uid, parts)
         await asyncio.gather(
             answer_task,
-            event.message.edit(text=text[:4000], attachments=attachments),
+            show_screen(uid, text, attachments, callback_message=event.message),
         )
     except Exception:
         if not answer_task.done():
@@ -444,6 +690,8 @@ async def dispatch(uid,parts):
         if me(uid):return role_screen(uid)
         profiles.choose(uid,act);return menu(uid)
     if act=='profile':
+        if me(uid) and me(uid)['role']=='teacher':
+            return teacher_screen(uid)
         if len(parts)==1:
             profiles.set_stage(uid,'')
             return profile_screen(uid)
@@ -458,25 +706,21 @@ async def dispatch(uid,parts):
             if field in ('interests','skills'):return tags_screen(uid,field)
         if action=='publishconfirm':
             if not profiles.complete(uid):return ui('Сначала заполни город, возраст, интересы и навыки.',[
-                [b('✏ Изменить','profile:edit')],home_btn()])
+                [b('✏️ Заполнить анкету','profile:edit')],home_btn()])
             return ui('🌍 Опубликовать анкету? Другие участники смогут видеть твои данные из анкеты. Контакты останутся скрытыми.',[
                 [b('✅ Да, опубликовать','profile:publish'),b('◀ Назад','profile')]])
         if action=='publish':
             ok=people.publish(uid)
             return ui('✅ Анкета опубликована!' if ok else 'Сначала заполни анкету.',[
-                [b('👥 Искать участников','p:student:0'),b('👤 Моя анкета','profile')]])
+                [b('👥 Искать участников','p:student:0'),profile_button(uid)]])
         if action=='hideconfirm':return ui('🔒 Скрыть анкету? Новые заявки станут недоступны; друзья сохранятся.',[
             [b('✅ Скрыть','profile:hide'),b('◀ Назад','profile')]])
         if action=='hide':
-            people.hide(uid);return ui('🔒 Анкета скрыта.',[[b('👤 Моя анкета','profile')],home_btn()])
+            people.hide(uid);return ui('🔒 Анкета скрыта.',[[profile_button(uid)],home_btn()])
         if action=='deleteconfirm':return ui('🗑 Удалить анкету? Это действие необратимо.',[
             [b('🗑 Да, удалить','profile:delete'),b('◀ Назад','profile')]])
         if action=='delete':
-            people.delete(uid);return ui('✅ Анкета удалена.',[[b('✏ Заполнить заново','profile:edit')],home_btn()])
-        if action=='link':
-            profiles.set_stage(uid,'contact_link')
-            return ui('🔗 Пришли ссылку https://max.ru/имя_профиля. Её увидят только участники, заявку которых ты примешь.',[
-                [b('◀ Отмена','profile')]])
+            people.delete(uid);return ui('✅ Анкета удалена.',[[b('✏️ Заполнить анкету','profile:edit')],home_btn()])
     if act=='tags':
         if parts[1]=='done':
             profiles.set_stage(uid,'')
@@ -609,26 +853,80 @@ async def dispatch(uid,parts):
         sub=parts[1]
         if sub=='check':return teacher_screen(uid)
         if sub=='checkstart':
-            profiles.set_stage(uid,'teacher_doc')
-            return ui('Отправьте ссылку на документ, подтверждающий работу педагогом. Его увидят только модераторы.',[home_btn()])
+            if not me(uid) or me(uid)['role']!='teacher':return teacher_screen(uid)
+            draft=te.verification_draft(uid)
+            field=next((f for f in te.TEACHER_FIELDS if not draft[f]), 'doc')
+            return dispatch(uid,['te','verify',field])
+        if sub=='verify':
+            if not me(uid) or me(uid)['role']!='teacher':return teacher_screen(uid)
+            if me(uid)['teacher_status'] in ('pending','approved'):return teacher_screen(uid)
+            field=parts[2]
+            if field=='doc':
+                draft=te.verification_draft(uid)
+                if not all(draft[f] for f in te.TEACHER_FIELDS):return teacher_screen(uid)
+                profiles.set_stage(uid,'teacher_doc')
+                return ui('📄 Отправь ссылку на документ (http:// или https://). Его увидят только модераторы.',
+                          [[b('◀ Назад','te:check')]])
+            if field not in te.TEACHER_FIELDS:return teacher_screen(uid)
+            profiles.set_stage(uid,'teacher_'+field)
+            prompts={'full_name':'✏️ Напиши ФИО полностью.',
+                     'workplace':'✏️ Укажи место работы (название образовательной организации).',
+                     'position':'✏️ Напиши свою должность.'}
+            return ui(prompts[field],[[b('◀ Назад','te:check')]])
         if sub=='new':
             if not te.is_teacher(uid):return teacher_screen(uid)
-            te.start_draft(uid);return draft_screen(uid)
-        if sub=='field':
+            te.start_draft(uid)
+            return draft_screen(uid)
+        if sub in ('field','editfield'):
             if not te.is_teacher(uid):return teacher_screen(uid)
-            field=parts[2]
-            if field=='format':return ui('Какой формат?',[
-                [b('🏫 Офлайн','te:format:офлайн'),b('💻 Онлайн','te:format:онлайн')]])
-            profiles.set_stage(uid,'event_'+field)
-            return ui(te.QUESTIONS[field],[[b('◀ К черновику','te:draft')]])
-        if sub=='format':te.set_draft(uid,'format',parts[2]);return draft_screen(uid)
+            return event_prompt(uid,parts[2],edit=sub=='editfield')
+        if sub=='format':
+            if not te.is_teacher(uid):return teacher_screen(uid)
+            # Старые кнопки te:format:офлайн тоже продолжают работать.
+            edit=len(parts)>3 and parts[2]=='edit'
+            value=parts[3] if len(parts)>3 else parts[2]
+            if value not in ('онлайн', 'офлайн'): return event_prompt(uid,'format',edit=edit)
+            te.set_draft(uid,'format',value)
+            profiles.set_stage(uid,'')
+            if edit:return draft_screen(uid,'edit')
+            data=event_data(uid)
+            next_field=next((f for f in EVENT_STEPS if not data.get(f)),None)
+            return event_prompt(uid,next_field) if next_field else draft_screen(uid,'preview')
+        if sub=='topicgroups':
+            if not te.is_teacher(uid): return teacher_screen(uid)
+            return event_topic_screen(uid, parts[2]=='edit')
+        if sub=='topicgroup':
+            if not te.is_teacher(uid): return teacher_screen(uid)
+            return event_topic_screen(uid, parts[2]=='edit', parts[3])
+        if sub=='topictoggle':
+            if not te.is_teacher(uid): return teacher_screen(uid)
+            edit = parts[2]=='edit'
+            group = parts[3]
+            try: tag = et.GROUPS[group][1][int(parts[4])]
+            except (KeyError, IndexError, ValueError): return event_topic_screen(uid, edit)
+            selected = et.normalize(event_data(uid).get('tags', []))
+            if tag in selected: selected.remove(tag)
+            else: selected.append(tag)
+            te.set_draft(uid, 'tags', selected)
+            return event_topic_screen(uid, edit, group)
+        if sub=='topicdone':
+            if not te.is_teacher(uid): return teacher_screen(uid)
+            edit = parts[2]=='edit'
+            if not et.normalize(event_data(uid).get('tags', [])):
+                return event_topic_screen(uid, edit)
+            if edit: return draft_screen(uid, 'edit')
+            next_field=next((f for f in EVENT_STEPS if not event_data(uid).get(f)),None)
+            return event_prompt(uid,next_field) if next_field else draft_screen(uid,'preview')
+        if sub=='edit':
+            profiles.set_stage(uid,'')
+            return draft_screen(uid,'edit')
         if sub=='draft':
             profiles.set_stage(uid,'')
-            return draft_screen(uid)
+            return draft_screen(uid,'preview' if all(event_data(uid).get(f) for f in EVENT_STEPS) else 'auto')
         if sub=='send':
             if not te.is_teacher(uid):return teacher_screen(uid)
             ok=te.send_review(uid)
-            return ui('⏳ Мероприятие отправлено на проверку.' if ok else 'Заполни все поля, включая корректную ссылку.',[
+            return ui('⏳ Мероприятие отправлено на проверку. Мы сообщим, когда оно появится в каталоге.' if ok else 'Заполни все поля, включая корректную ссылку.',[
                 [b('🗂 Мои мероприятия','te:mine'),b('✏ К черновику','te:draft')],home_btn()])
         if sub=='mine':
             if not te.is_teacher(uid):return teacher_screen(uid)
@@ -716,7 +1014,7 @@ async def text_handler(event):
     stage=profiles.stage(uid)
     if stage == 'role_change_reason':
         if not 5 <= len(value) <= 1000:
-            return await event.message.answer('Напиши причину от 5 до 1000 символов.')
+            return await show_screen(event.message.sender.user_id, 'Напиши причину от 5 до 1000 символов.')
         ok, message = rr.submit(uid, value)
         if ok:
             profiles.set_stage(uid, '')
@@ -725,7 +1023,7 @@ async def text_handler(event):
                 mods=[r['user_id'] for r in db.execute('SELECT user_id FROM moderator_users')]
             for mod in mods:
                 queue_notify(mod,'🔄 Поступила заявка на смену роли.',keyboard([[b('🛡 Посмотреть заявки','mod:roles')]]))
-        return await event.message.answer(text=message,attachments=keyboard([[b('🏠 В меню','home')]]))
+        return await show_screen(event.message.sender.user_id, text=message,attachments=keyboard([[b('🏠 В меню','home')]]))
     if stage == 'event_date_filter':
         try:
             from datetime import datetime as dt
@@ -734,23 +1032,23 @@ async def text_handler(event):
             chosen=dt.strptime(value,'%d.%m.%y').date()
             flt.update(uid,'period',chosen.isoformat())
         except ValueError:
-            return await event.message.answer('Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
+            return await show_screen(event.message.sender.user_id, 'Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
         profiles.set_stage(uid,'')
-        text,attachments=flt.screen(uid)
-        return await event.message.answer(text='✅ Дата сохранена.\n'+text,attachments=attachments)
+        text,attachments=flt.screen(uid, 'home')
+        return await show_screen(event.message.sender.user_id, text=text,attachments=attachments)
     if stage.startswith('modrole_'):
         if not te.is_moderator(uid):return
-        if not 3<=len(value)<=1000:return await event.message.answer('Напиши причину от 3 до 1000 символов.')
+        if not 3<=len(value)<=1000:return await show_screen(event.message.sender.user_id, 'Напиши причину от 3 до 1000 символов.')
         target,msg=rr.decide(uid,int(stage.split('_')[1]),False,value)
         profiles.set_stage(uid,'')
         if target:queue_notify(target,msg,keyboard([[b('✉ Написать модератору','role:change')],home_btn()]))
         text,attachments=mod_screen(uid,'roles')
-        return await event.message.answer(text=msg+'\n\n'+text,attachments=attachments)
+        return await show_screen(event.message.sender.user_id, text=msg+'\n\n'+text,attachments=attachments)
     if stage.startswith('dmreport_'):
         peer=int(stage.split('_')[1]);profiles.set_stage(uid,'')
         if dm.report(uid,peer,'Другое: '+value[:800]):
-            return await event.message.answer('🚩 Жалоба отправлена. Общение прекращено.',attachments=keyboard([home_btn()]))
-        return await event.message.answer('Не удалось отправить жалобу.',attachments=keyboard([home_btn()]))
+            return await show_screen(event.message.sender.user_id, '🚩 Жалоба отправлена. Общение прекращено.',attachments=keyboard([home_btn()]))
+        return await show_screen(event.message.sender.user_id, 'Не удалось отправить жалобу.',attachments=keyboard([home_btn()]))
     if stage.startswith('dm_'):
         peer=int(stage.split('_')[1])
         ok,msg=dm.send(uid,peer,value)
@@ -758,34 +1056,26 @@ async def text_handler(event):
             profiles.set_stage(uid,'')
             queue_notify(peer,('📩 Новое сообщение от педагога ' if me(uid)['role']=='teacher' else '💬 Новое сообщение от ')+name(uid)+'!\n\n'+value[:3500],
                 keyboard([[b('✏ Ответить',f'dm:reply:{uid}'),b('🚩 Пожаловаться',f'dm:report:{uid}')]]))
-        return await event.message.answer(text=msg,attachments=keyboard([[b('🤝 Друзья','friend:0')],home_btn()]))
+        return await show_screen(event.message.sender.user_id, text=msg,attachments=keyboard([[b('🤝 Друзья','friend:0')],home_btn()]))
     if stage == 'moderator_code':
         # Обработка отдельно от анкеты: код нельзя сохранить как поле профиля.
         ok, message = te.login_moderator(uid, value)
         if ok:
             profiles.set_stage(uid, '')
             text, attachments = mod_screen(uid)
-            return await event.message.answer(text=message+'\n\n'+text,attachments=attachments)
+            return await show_screen(event.message.sender.user_id, text=message+'\n\n'+text,attachments=attachments)
         if 'заблокирован' in message.lower() or 'не настроен' in message.lower():
             profiles.set_stage(uid, '')
-        return await event.message.answer(text=message, attachments=keyboard([
+        return await show_screen(event.message.sender.user_id, text=message, attachments=keyboard([
             [b('✕ Отмена','mod:cancel_login')],home_btn()]))
     if stage:
         p=me(uid)
         if stage=='city':
-            if not 1<=len(value)<=70:return await event.message.answer('Укажи название города до 70 символов.')
+            if not 1<=len(value)<=70:return await show_screen(event.message.sender.user_id, 'Укажи название города до 70 символов.')
             profiles.set_field(uid,'city',value)
         elif stage=='age':
-            if not value.isdigit() or not 3<=int(value)<=100:return await event.message.answer('Введи корректный возраст от 3 до 100.')
+            if not value.isdigit() or not 3<=int(value)<=100:return await show_screen(event.message.sender.user_id, 'Введи корректный возраст от 3 до 100.')
             profiles.set_field(uid,'age',int(value))
-        elif stage=='contact_link':
-            from urllib.parse import urlparse
-            url=urlparse(value)
-            if url.scheme!='https' or url.hostname not in ('max.ru','www.max.ru') or not url.path.strip('/'):
-                return await event.message.answer('Нужна ссылка вида https://max.ru/имя_профиля')
-            with connect() as db:
-                db.execute('''INSERT INTO people_settings(user_id,contact_link) VALUES (?,?)
-                    ON CONFLICT(user_id) DO UPDATE SET contact_link=excluded.contact_link''',(uid,value))
         elif stage.startswith('modteacher_'):
             if not te.is_moderator(uid):return
             target=te.decide_teacher(uid,int(stage.split('_')[1]),False,value[:1000])
@@ -794,33 +1084,54 @@ async def text_handler(event):
             if not te.is_moderator(uid):return
             target=te.decide_event(uid,int(stage.split('_')[1]),False,value[:1000])
             if target:await notify(target,'✕ Мероприятие отклонено. Замечания: '+value[:1000])
+        elif stage.startswith('teacher_') and stage!='teacher_doc':
+            field=stage[len('teacher_'):]
+            if not te.save_verification_field(uid,field,value):
+                return await show_screen(uid, 'Введи от 2 до 150 символов. ФИО указывай минимум из двух слов.')
+            profiles.set_stage(uid,'')
+            next_fields=list(te.TEACHER_FIELDS)
+            current=next_fields.index(field)
+            if current+1<len(next_fields):
+                text,attachments=dispatch(uid,['te','verify',next_fields[current+1]])
+            else:
+                text,attachments=teacher_screen(uid)
+            return await show_screen(uid,text='✅ Сохранено!\n\n'+text,attachments=attachments)
         elif stage=='teacher_doc':
-            if not te.check_submit(uid,value):return await event.message.answer('Укажи корректную ссылку http/https.')
-        elif stage.startswith('event_'):
-            field=stage[6:]
+            if not te.check_submit(uid,value):
+                return await show_screen(uid, 'Проверь, что ФИО, место работы и должность заполнены, а ссылка начинается с http:// или https://.')
+        elif stage.startswith('event_') or stage.startswith('eventedit_'):
+            edit=stage.startswith('eventedit_')
+            field=stage[len('eventedit_'):] if edit else stage[len('event_'):]
             if field not in te.FIELDS:return
-            if field=='url' and not te.valid_url(value):return await event.message.answer('Нужна ссылка http/https.')
-            if len(value)>2000:return await event.message.answer('Максимум 2000 символов.')
+            if field in ('format','tags'):
+                return await show_screen(uid, text='Выбери вариант кнопками.', attachments=event_prompt(uid, field, edit)[1])
+            if field=='url' and not te.valid_url(value):
+                return await show_screen(uid, 'Нужна ссылка, начинающаяся с http:// или https://.')
+            if len(value)>2000:return await show_screen(uid, 'Максимум 2000 символов.')
             te.set_draft(uid,field,value)
         else:return
         profiles.set_stage(uid,'')
-        if profiles.complete(uid):profiles.set_field(uid,'waiting',0)
-        if stage.startswith('event_'):text,attachments=draft_screen(uid)
+        if p and p['role']=='student' and profiles.complete(uid):profiles.set_field(uid,'waiting',0)
+        if stage.startswith('eventedit_'):
+            text,attachments=draft_screen(uid,'edit')
+        elif stage.startswith('event_'):
+            next_field=next((f for f in EVENT_STEPS if not event_data(uid).get(f)),None)
+            text,attachments=event_prompt(uid,next_field) if next_field else draft_screen(uid,'preview')
         elif stage.startswith('modteacher_'):text,attachments=mod_screen(uid,'teachers')
         elif stage.startswith('modevent_'):text,attachments=mod_screen(uid,'events')
         elif stage=='teacher_doc':text,attachments=teacher_screen(uid)
         else:text,attachments=profile_screen(uid)
-        return await event.message.answer(text='✅ Изменения сохранены!\n\n'+text,attachments=attachments)
+        return await show_screen(event.message.sender.user_id, text='✅ Изменения сохранены!\n\n'+text,attachments=attachments)
     peer=social.partner(uid)
     if peer and social.friends(uid,peer) and not social.blocked(uid,peer) and not social.banned(uid) and not social.banned(peer):
-        if len(value)>3800:return await event.message.answer('Сообщение слишком длинное (максимум 3800 символов).')
+        if len(value)>3800:return await show_screen(event.message.sender.user_id, 'Сообщение слишком длинное (максимум 3800 символов).')
         RECENT_MESSAGES[social.pair(uid,peer)].append(f'{name(uid)}: {value[:300]}')
         await notify(peer,f'💬 Новое сообщение от {name(uid)}:\n{value}',keyboard([
             [b('✏ Ответить','chat:screen'),b('✕ Завершить','chat:endconfirm')]]))
-        return await event.message.answer('Твоё сообщение передано собеседнику. Ждём ответа!',attachments=keyboard([
+        return await show_screen(event.message.sender.user_id, 'Твоё сообщение передано собеседнику. Ждём ответа!',attachments=keyboard([
             [b('✕ Завершить разговор','chat:endconfirm'),b('🚩 Пожаловаться','chat:report')]]))
     text,attachments=menu(uid)
-    await event.message.answer(text='Выбери действие кнопкой.\n'+text,attachments=attachments)
+    await show_screen(event.message.sender.user_id, text='Выбери действие кнопкой.\n'+text,attachments=attachments)
 
 
 if __name__=='__main__':

@@ -1,5 +1,6 @@
 import json
 from catalog import connect
+from event_tags import normalize
 
 with open('events.json', encoding='utf-8-sig') as file:
     events = json.load(file)
@@ -14,4 +15,4 @@ with connect() as db:
             tags=excluded.tags,status=COALESCE(events.status,excluded.status)''',
             (event['url'], event['title'], event.get('description'),
              event.get('date'), event.get('place'), event.get('format'),
-             json.dumps(event.get('tags', []), ensure_ascii=False), event.get('status')))
+             json.dumps(normalize(event.get('tags', [])), ensure_ascii=False), event.get('status')))

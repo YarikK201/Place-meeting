@@ -8,11 +8,16 @@ import social
 def init():
     with connect() as db:
         db.executescript('''CREATE TABLE IF NOT EXISTS people_settings (
-            user_id INTEGER PRIMARY KEY, visible INTEGER DEFAULT 0, contact_link TEXT DEFAULT '');
+            user_id INTEGER PRIMARY KEY, visible INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS people_likes(from_id INTEGER,to_id INTEGER,PRIMARY KEY(from_id,to_id));
             CREATE TABLE IF NOT EXISTS people_requests(from_id INTEGER,to_id INTEGER,status TEXT DEFAULT 'pending',PRIMARY KEY(from_id,to_id));
             CREATE TABLE IF NOT EXISTS people_filters(user_id INTEGER PRIMARY KEY,
               city TEXT DEFAULT '',interest TEXT DEFAULT '',role TEXT DEFAULT 'student');''')
+        # У старых пользователей ссылка MAX могла быть записана в БД.
+        # Стираем её при обновлении, больше эту информацию не собираем.
+        old_cols={r['name'] for r in db.execute('PRAGMA table_info(people_settings)')}
+        if 'contact_link' in old_cols:
+            db.execute("UPDATE people_settings SET contact_link='' WHERE contact_link!=''")
         cols={r['name'] for r in db.execute('PRAGMA table_info(people_filters)')}
         for key in ('ages','interests','skills','draft_ages','draft_interests','draft_skills'):
             if key not in cols:
@@ -40,11 +45,19 @@ def hide(uid):
 
 
 def delete(uid):
-    hide(uid)
+    # Удаляем дружбу у обеих сторон и закрываем активные разговоры.
+    # Всё происходит в одной транзакции, вместе с очисткой анкеты.
     with connect() as db:
-        db.execute('DELETE FROM people_settings WHERE user_id=?',(uid,))
-        db.execute('DELETE FROM people_filters WHERE user_id=?',(uid,))
-    profiles.delete(uid)
+        db.execute('DELETE FROM friendships WHERE uid1=? OR uid2=?', (uid, uid))
+        db.execute('DELETE FROM conversations WHERE uid1=? OR uid2=?', (uid, uid))
+        db.execute("""UPDATE friendship_requests SET status='cancelled'
+            WHERE (sender=? OR recipient=?) AND status='pending'""", (uid, uid))
+        db.execute('DELETE FROM people_settings WHERE user_id=?', (uid,))
+        db.execute('DELETE FROM people_filters WHERE user_id=?', (uid,))
+        db.execute('DELETE FROM direct_messages WHERE sender=? OR recipient=?', (uid, uid))
+        db.execute("""UPDATE profiles SET bio='',city='',age=NULL,interests='[]',skills='[]',
+            waiting=1 WHERE user_id=?""", (uid,))
+        db.execute('DELETE FROM user_workflows WHERE user_id=?', (uid,))
 
 
 def search_filter(uid):
@@ -92,9 +105,12 @@ def update_filter(uid,field,value):
 
 def list_people(uid,role=None):
     s=settings(uid)
-    if not s or not s['visible'] or not profiles.complete(uid) or social.banned(uid):return []
     owner=profiles.get(uid)
-    if owner and owner['role']=='teacher' and owner['teacher_status']!='approved':return []
+    if not owner or social.banned(uid):return []
+    if owner['role']=='teacher':
+        if owner['teacher_status']!='approved':return []
+    elif not s or not s['visible'] or not profiles.complete(uid):
+        return []
     f=search_filter(uid)
     role=role or f['role']
     with connect() as db:
@@ -107,6 +123,7 @@ def list_people(uid,role=None):
     ages=get_values(uid,'ages');ints=get_values(uid,'interests');skills=get_values(uid,'skills')
     if role=='teacher':rows=[p for p in rows if p['teacher_status']=='approved']
     def matches(p):
+        if p['role']=='teacher':return True  # У педагогов нет ученических полей возраста и интересов.
         if ages and not (p['age'] is not None and any(lo<=p['age']<=hi for lo,hi in (map(int,a.split('-')) for a in ages))):return False
         pi=set(json.loads(p['interests'] or '[]'));ps=set(json.loads(p['skills'] or '[]'))
         return (not ints or bool(pi.intersection(ints))) and (not skills or bool(ps.intersection(skills)))
@@ -119,6 +136,9 @@ def list_people(uid,role=None):
 def card_text(p,index=None,total=None):
     title=p['name'] or 'Участник'
     hdr=f'👤 {title}' if index is None else f'👤 {title} — {index+1}/{total}'
+    if p['role']=='teacher':
+        return (f'{hdr}\n🏫 Место работы: {p["teacher_workplace"] or "Не указано"}\n'
+                f'💼 Должность: {p["teacher_position"] or "Не указана"}')
     def tags(k):return ', '.join(json.loads(p[k] or '[]')) or 'Не указано'
     return (f'{hdr}\n📍 Город: {p["city"] or "Не указан"}\n'
             f'🎂 Возраст: {p["age"] or "Не указан"}\n'
