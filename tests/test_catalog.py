@@ -1,71 +1,70 @@
-import json
-import tempfile
-import unittest
-from pathlib import Path
-from unittest.mock import MagicMock
-from catalog import connect, count, one, import_json
-from bot import catalog_card, process_update
+"""Regression tests for current dev screens (the old tests targeted removed APIs)."""
+from test_bot import NavigationCase, app, catalog
 
 
-class CatalogTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.path = Path(self.temp.name)
-        self.db = connect(self.path / 'test.db')
-        self.dataset = [
-            {'source_id': 'source-1', 'title': 'Конкурс идей', 'description': 'Подробности', 'event_date': '2026-11-01', 'location': 'Онлайн', 'source_url': 'https://example.org/event/1'},
-            {'source_id': 'source-2', 'title': 'Кружок', 'event_date': '2026-11-02', 'source_url': 'https://example.org/event/2'},
-        ]
+class WorkflowTests(NavigationCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        app.profiles.choose(1, 'student')
+        with catalog.connect() as db:
+            db.execute("INSERT INTO events(id,url,title,description,tags,status) VALUES (5,'https://example.org','Тестовое событие','Описание','[]','published')")
 
-    def tearDown(self):
-        self.db.close()
-        self.temp.cleanup()
+    async def test_catalog_and_favorites(self):
+        mid = await self.screen()
+        await app.callback(self.click(1, mid, 'card:0'))
+        self.assertIn('Тестовое событие', self.transport.edit_message.call_args.kwargs['text'])
+        await app.callback(self.click(1, mid, 'favtoggle:5:card:0'))
+        await app.callback(self.click(1, mid, 'favorite:0'))
+        self.assertIn('Тестовое событие', self.transport.edit_message.call_args.kwargs['text'])
+        self.assertTrue(app.fav.saved(1, 5))
 
-    def feed(self, data=None):
-        file = self.path / 'events.json'
-        file.write_text(json.dumps(self.dataset if data is None else data, ensure_ascii=False), encoding='utf-8')
-        return import_json(self.db, file)
+    async def test_moderation_and_people_navigation(self):
+        with catalog.connect() as db:
+            db.execute('INSERT INTO moderator_users(user_id) VALUES (1)')
+        mid = await self.screen()
+        for action in ['mod:home', 'mod:teachers', 'p:student:0']:
+            await app.callback(self.click(1, mid, action))
+            text = self.transport.edit_message.call_args.kwargs['text']
+            self.assertTrue(text)
+        self.assertEqual(app.screen_id(1), mid)
 
-    def test_import_twice_no_duplicates(self):
-        self.assertEqual(self.feed(), 2)
-        self.assertEqual(self.feed(), 2)
-        self.assertEqual(count(self.db), 2)
+    async def test_message_notification_targets_notification(self):
+        app.profiles.choose(2, 'student')
+        with catalog.connect() as db:
+            db.execute("INSERT INTO friendships(uid1,uid2) VALUES (1,2)")
+        await self.screen(2)
+        await app.notify(2, 'Тестовое сообщение', app.keyboard([[app.b('Ответить','chat:screen')]]))
+        await app.callback(self.click(2, 'm2', 'chat:screen'))
+        self.assertEqual(self.transport.edit_message.call_args.kwargs['message_id'], 'm2')
 
-    def test_upsert_updates_record(self):
-        self.feed()
-        self.dataset[0]['title'] = 'Новое название'
-        self.feed()
-        self.assertEqual(one(self.db, 0)['title'], 'Новое название')
-        self.assertEqual(count(self.db), 2)
+    async def test_direct_message_reply_workflow(self):
+        from types import SimpleNamespace as NS
+        import asyncio
+        app.profiles.choose(2, 'student')
+        with catalog.connect() as db:
+            db.execute('INSERT INTO friendships(uid1,uid2) VALUES (1,2)')
+        mid = await self.screen(1)
+        await app.callback(self.click(1, mid, 'dm:write:2'))
+        self.assertEqual(app.profiles.stage(1), 'dm_2')
+        await app.text_handler(NS(message=NS(sender=NS(user_id=1), body=NS(text='Тест'))))
+        await asyncio.gather(*list(app._NOTIFY_TASKS))
+        self.assertEqual(app.dm.last(1, 2)['text'], 'Тест')
+        with catalog.connect() as db:
+            notification = db.execute('SELECT message_id FROM ui_callbacks WHERE user_id=2').fetchone()[0]
+        await app.callback(self.click(2, notification, 'dm:reply:1'))
+        self.assertEqual(app.profiles.stage(2), 'dm_1')
+        self.assertEqual(self.transport.edit_message.call_args.kwargs['message_id'], notification)
 
-    def test_invalid_input_does_not_import_partially(self):
-        self.dataset[1]['source_url'] = 'javascript:alert(1)'
-        with self.assertRaises(ValueError):
-            self.feed()
-        self.assertEqual(count(self.db), 0)
-
-    def test_empty_catalog(self):
-        text, buttons = catalog_card(self.db, 0, False)
-        self.assertIn('нет мероприятий', text)
-        self.assertIsNone(buttons)
-
-    def test_navigation_and_link(self):
-        self.feed()
-        text, buttons = catalog_card(self.db, 0, True)
-        self.assertIn('Подробности', text)
-        self.assertEqual(buttons[-2][0]['url'], 'https://example.org/event/1')
-        self.assertEqual(buttons[0][0]['payload'], 'cat:1:0')
-
-    def test_message_and_button_handlers(self):
-        self.feed()
-        client = MagicMock()
-        update = {'update_type': 'message_created', 'message': {'recipient': {'chat_type': 'dialog'}, 'sender': {'user_id': 123}, 'body': {'text': '/catalog'}}}
-        self.assertTrue(process_update(client, self.db, update))
-        self.assertEqual(client.send_to_user.call_args.args[0], 123)
-        click = {'update_type': 'message_callback', 'callback': {'callback_id': 'test-id', 'payload': 'cat:1:1'}, 'message': {'recipient': {'chat_type': 'dialog'}}}
-        self.assertTrue(process_update(client, self.db, click))
-        self.assertEqual(client.answer_callback.call_args.args[0], 'test-id')
-
-
-if __name__ == '__main__':
-    unittest.main()
+    async def test_moderation_notification_approves_teacher(self):
+        import asyncio
+        app.profiles.choose(2, 'teacher')
+        with catalog.connect() as db:
+            db.execute('INSERT INTO moderator_users(user_id) VALUES (1)')
+            db.execute("INSERT INTO teacher_checks(id,user_id,doc_url,status,created) VALUES (3,2,'https://example.org','pending','2026-11-08')")
+        await self.screen(1)
+        await app.notify(1, 'Заявка', app.keyboard([[app.b('Проверить', 'mod:teachers')]]))
+        await app.callback(self.click(1, 'm2', 'mod:teachers'))
+        await app.callback(self.click(1, 'm2', 'mod:teacherok:3'))
+        await asyncio.gather(*list(app._NOTIFY_TASKS))
+        self.assertEqual(app.profiles.get(2)['teacher_status'], 'approved')
+        self.assertEqual(app.screen_id(1), 'm2')

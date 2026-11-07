@@ -1,6 +1,8 @@
 """SQLite: схема создаётся один раз на процесс, соединения всегда закрываются."""
 import os
 import sqlite3
+import logging
+from time import perf_counter
 from threading import Lock
 
 PATH = os.getenv('EVENTS_DB', '/data/events_v2.db')
@@ -10,11 +12,17 @@ _schema_lock = Lock()
 
 class ClosingConnection(sqlite3.Connection):
     """Контекстный менеджер закрывает sqlite-соединение даже при ошибке."""
+    def __init__(self, *args, **kwargs):
+        self.started = perf_counter()
+        super().__init__(*args, **kwargs)
+
     def __exit__(self, exc_type, exc_value, traceback):
         try:
             return super().__exit__(exc_type, exc_value, traceback)
         finally:
             self.close()
+            logging.getLogger("place_meeting.db").info(
+                "db elapsed_ms=%.1f", (perf_counter() - self.started) * 1000)
 
 
 def connect():

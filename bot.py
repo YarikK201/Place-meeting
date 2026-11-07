@@ -2,6 +2,12 @@
 import asyncio
 import json
 import os
+import logging
+from copy import deepcopy
+from functools import wraps
+from time import perf_counter
+from uuid import uuid4
+from maxapi.exceptions import MaxApiError
 from collections import defaultdict, deque
 from datetime import datetime
 from maxapi import Bot, Dispatcher, F
@@ -13,6 +19,7 @@ import event_tags as et
 
 bot = Bot(os.environ['MAX_BOT_TOKEN'])
 dp = Dispatcher()
+LOG = logging.getLogger("place_meeting.ui")
 
 # Подготавливаем таблицы один раз при запуске.
 for module in (profiles, social, people, te, flt, fav, rr, dm):
@@ -32,6 +39,70 @@ with connect() as db:
         message_id TEXT NOT NULL,
         PRIMARY KEY (user_id, message_id)
     )''')
+
+# Уведомления не становятся рабочим экраном до нажатия на их кнопку.
+with connect() as db:
+    db.execute("""CREATE TABLE IF NOT EXISTS ui_callbacks (
+        user_id INTEGER NOT NULL, message_id TEXT NOT NULL, revision TEXT NOT NULL,
+        PRIMARY KEY (user_id, message_id))""")
+
+_ACTION_LOCKS = defaultdict(asyncio.Lock)
+_CLEANUP_TASKS = {}
+
+
+def serialized(handler):
+    @wraps(handler)
+    async def wrapped(event):
+        async with _ACTION_LOCKS[event.message.sender.user_id]:
+            try:
+                return await handler(event)
+            except Exception as error:
+                LOG.warning("handler_failed type=%s", type(error).__name__)
+                await notify(event.message.sender.user_id,
+                             'Не удалось обновить экран. Открой /start для продолжения.')
+    return wrapped
+
+
+async def api_call(operation, **kwargs):
+    started = perf_counter()
+    try:
+        result = await getattr(bot, operation)(**kwargs)
+        if result is None or getattr(result, 'success', True) is False:
+            raise RuntimeError('MAX operation was not successful')
+        return result
+    finally:
+        LOG.info("api operation=%s elapsed_ms=%.1f", operation,
+                 (perf_counter() - started) * 1000)
+
+
+def versioned_buttons(attachments):
+    revision = uuid4().hex[:16]
+    result = deepcopy(attachments or [])
+    for attachment in result:
+        if attachment.type == 'inline_keyboard':
+            for row in attachment.payload.buttons:
+                for button in row:
+                    if button.type == 'callback':
+                        button.payload = f'ui:{revision}:{button.payload or ""}'
+                        if len(button.payload.encode('utf-8')) > 256:
+                            raise ValueError('Callback payload is too long')
+    return result, revision
+
+
+def save_revision(uid, mid, revision):
+    with connect() as db:
+        db.execute('INSERT OR REPLACE INTO ui_callbacks VALUES (?, ?, ?)',
+                   (uid, mid, revision))
+
+
+def queue_cleanup(uid):
+    task = _CLEANUP_TASKS.get(uid)
+    if task is None or task.done():
+        task = asyncio.create_task(remove_old_screens(uid))
+        _CLEANUP_TASKS[uid] = task
+        task.add_done_callback(lambda done: _CLEANUP_TASKS.pop(uid, None)
+                               if _CLEANUP_TASKS.get(uid) is done else None)
+
 
 _SCREEN_LOCKS = defaultdict(asyncio.Lock)
 
@@ -60,30 +131,40 @@ def remember_screen(uid, mid):
 
 
 async def remove_old_screens(uid):
-    """Удаляет только старые рабочие экраны, ID которых сохранил бот."""
-    with connect() as db:
-        old_messages = db.execute(
-            'SELECT message_id FROM old_ui_messages WHERE user_id=? LIMIT 10',
-            (uid,)).fetchall()
-    current = screen_id(uid)
-    for row in old_messages:
-        mid = row['message_id']
-        if mid == current:
-            continue
-        try:
-            result = await bot.delete_message(message_id=mid)
-            if result is not None and getattr(result, 'success', True) is False:
-                continue
-        except Exception as error:
-            # Удалённые вручную сообщения MAX может возвращать как 404.
-            # Остальные ошибки оставляем для следующей попытки.
-            if not any(x in str(error).lower() for x in ('404', 'not found', 'not_found')):
-                continue
-        with connect() as db:
-            db.execute('DELETE FROM old_ui_messages WHERE user_id=? AND message_id=?',
-                       (uid, mid))
-        # MAX ограничивает частоту удаления сообщений в одном диалоге.
-        await asyncio.sleep(0.55)
+    """Старые экраны уже недоступны для callback; удаляем их вне перехода."""
+    started = perf_counter()
+    try:
+        attempted = set()
+        while True:
+            with connect() as db:
+                rows = db.execute('SELECT message_id FROM old_ui_messages WHERE user_id=?',
+                                  (uid,)).fetchall()
+            pending = [row for row in rows if row['message_id'] not in attempted]
+            if not pending:
+                break
+            for row in pending:
+                mid = row['message_id']
+                attempted.add(mid)
+                if mid == screen_id(uid):
+                    continue
+                try:
+                    await api_call('delete_message', message_id=mid)
+                except MaxApiError as error:
+                    if error.code != 404:
+                        LOG.warning('cleanup_failed type=%s', type(error).__name__)
+                        return
+                except Exception as error:
+                    LOG.warning('cleanup_failed type=%s', type(error).__name__)
+                    return
+                with connect() as db:
+                    db.execute('DELETE FROM old_ui_messages WHERE user_id=? AND message_id=?', (uid, mid))
+                    db.execute('DELETE FROM ui_callbacks WHERE user_id=? AND message_id=?', (uid, mid))
+                # Пауза относится только к фоновой очистке, не к ответу на кнопку.
+                await asyncio.sleep(0.55)
+    except Exception as error:
+        LOG.warning('cleanup_failed type=%s', type(error).__name__)
+    finally:
+        LOG.info('cleanup elapsed_ms=%.1f', (perf_counter() - started) * 1000)
 
 
 def sent_id(result):
@@ -94,50 +175,35 @@ def sent_id(result):
 
 
 async def show_screen(uid, text, attachments=None, callback_message=None, force_new=False):
-    # Один рабочий экран на человека. Другие экраны из нашего списка удаляем.
     async with _SCREEN_LOCKS[uid]:
-        mid = screen_id(uid)
         callback_mid = getattr(getattr(callback_message, 'body', None), 'mid', None)
-        if not mid and callback_mid:
-            mid = callback_mid
-            remember_screen(uid, mid)
-
-        # Команда /start (и другие текстовые команды) должна показать экран
-        # в конце чата. Если редактировать старое сообщение, пользователь
-        # может не заметить ответ — экран останется далеко выше.
+        mid = callback_mid or screen_id(uid)
+        buttons, revision = versioned_buttons(attachments)
         if mid and not force_new:
             try:
-                result = await bot.edit_message(
-                    message_id=mid, text=text[:3999],
-                    attachments=attachments if attachments is not None else [],
-                    notify=False)
-                # API иногда возвращает success=false без исключения.
-                if result is not None and getattr(result, 'success', True) is False:
-                    raise RuntimeError('MAX не смог отредактировать рабочий экран')
-                await remove_old_screens(uid)
-                return result
-            except Exception as error:
-                # Если сообщение удалили вручную, создаём новый экран.
-                # При сетевых ошибках не создаём дубликаты.
-                reason = str(error).lower()
-                if not any(word in reason for word in (
-                    '404', '403', 'not found', 'not_found',
-                    'message.not.found', 'message.not_found',
-                    'message_not_found', 'not accessible', 'forbidden',
-                )):
+                result = await api_call('edit_message', message_id=mid, text=text[:3999],
+                                        attachments=buttons, notify=False)
+            except MaxApiError as error:
+                # Только достоверное отсутствие сообщения разрешает замену.
+                if error.code != 404:
                     raise
-
-        sent = await bot.send_message(
-            user_id=uid, text=text[:3999], attachments=attachments)
+            else:
+                remember_screen(uid, mid)
+                save_revision(uid, mid, revision)
+                queue_cleanup(uid)
+                return result
+        sent = await api_call('send_message', user_id=uid, text=text[:3999], attachments=buttons)
         new_mid = sent_id(sent)
         if not new_mid:
-            # Ответ уже отправлен. Не падаем и не блокируем /start,
-            # даже если библиотека изменила формат ответа.
-            print('Предупреждение: MAX не вернул ID сообщения, экран нельзя сохранить')
-            return sent
+            raise RuntimeError('MAX response has no message ID')
         remember_screen(uid, new_mid)
-        await remove_old_screens(uid)
+        save_revision(uid, new_mid, revision)
+        queue_cleanup(uid)
         return sent
+
+
+async def new_screen(uid, text, attachments=None):
+    return await show_screen(uid, text, attachments, force_new=True)
 
 
 def keyboard(rows):
@@ -562,11 +628,15 @@ def mod_screen(uid,which='home'):
     return mod_screen(uid,'home')
 
 
-async def notify(uid,text,attachments=None):
-    try:await bot.send_message(user_id=uid,text=text[:4000],attachments=attachments)
-    except Exception:
-        # Не останавливаем бота, если уведомление временно не доставлено.
-        pass
+async def notify(uid, text, attachments=None):
+    try:
+        buttons, revision = versioned_buttons(attachments)
+        sent = await api_call('send_message', user_id=uid, text=text[:4000], attachments=buttons)
+        mid = sent_id(sent)
+        if mid and buttons:
+            save_revision(uid, mid, revision)
+    except Exception as error:
+        LOG.warning('notification_failed type=%s', type(error).__name__)
 
 
 _NOTIFY_TASKS = set()
@@ -580,6 +650,7 @@ def queue_notify(uid, text, attachments=None):
 
 
 @dp.message_created(Command('start'))
+@serialized
 async def start(event):
     uid=event.message.sender.user_id
     text,attachments=role_screen(uid)
@@ -588,26 +659,31 @@ async def start(event):
     await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('catalog'))
+@serialized
 async def catalog_cmd(event):
     text,attachments=event_card(0,event.message.sender.user_id)
     await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('people'))
+@serialized
 async def people_cmd(event):
     text,attachments=people_screen(event.message.sender.user_id)
     await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('profile'))
+@serialized
 async def profile_cmd(event):
     text,attachments=profile_screen(event.message.sender.user_id)
     await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('filters'))
+@serialized
 async def filters_cmd(event):
     text,attachments=flt.screen(event.message.sender.user_id)
     await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
 
 @dp.message_created(Command('moderator'))
+@serialized
 async def moderator_cmd(event):
     uid = event.message.sender.user_id
     if te.is_moderator(uid):
@@ -623,6 +699,7 @@ async def moderator_cmd(event):
 
 
 @dp.message_created(Command('moderator_logout'))
+@serialized
 async def moderator_logout_cmd(event):
     uid = event.message.sender.user_id
     te.logout_moderator(uid)
@@ -633,26 +710,48 @@ async def moderator_logout_cmd(event):
 
 @dp.message_callback()
 async def callback(event):
+    started = perf_counter()
     uid = event.callback.user.user_id
-    parts = (event.callback.payload or '').split(':')
-    # Во время ввода причины отказа старые кнопки одобрения/отказа не действуют.
-    stage = profiles.stage(uid)
-    if stage and stage.startswith('modteacher_') and parts[:2] in (["mod","teacherok"],["mod","teacherreject"]):
-        await event.answer()
-        return
-
-    # Подтверждаем нажатие и обновляем карточку одновременно.
-    answer_task = asyncio.create_task(event.answer())
+    LOG.info('callback received')
     try:
-        text, attachments = await dispatch(uid, parts)
-        await asyncio.gather(
-            answer_task,
-            show_screen(uid, text, attachments, callback_message=event.message),
-        )
-    except Exception:
-        if not answer_task.done():
-            answer_task.cancel()
-        raise
+        # Сначала подтверждение, затем SQLite, ожидание блокировки и бизнес-логика.
+        ack_started = perf_counter()
+        try:
+            await asyncio.wait_for(event.answer(), timeout=3)
+        except Exception as error:
+            LOG.warning('callback_ack_failed type=%s', type(error).__name__)
+        finally:
+            LOG.info('callback_ack elapsed_ms=%.1f', (perf_counter() - ack_started) * 1000)
+        async with _ACTION_LOCKS[uid]:
+            mid = getattr(getattr(event.message, 'body', None), 'mid', None)
+            payload = event.callback.payload or ''
+            prefix, separator, action = payload.partition(':')
+            revision, _, action = action.partition(':')
+            with connect() as db:
+                row = db.execute('SELECT revision FROM ui_callbacks WHERE user_id=? AND message_id=?',
+                                 (uid, mid)).fetchone()
+                old = db.execute('SELECT 1 FROM old_ui_messages WHERE user_id=? AND message_id=?',
+                                 (uid, mid)).fetchone()
+                if prefix != 'ui' or not separator or not row or old or row['revision'] != revision:
+                    LOG.info('callback ignored_stale')
+                    return
+                # Одно поколение кнопок применяем ровно один раз, даже при ошибке API.
+                db.execute("UPDATE ui_callbacks SET revision='' WHERE user_id=? AND message_id=?", (uid, mid))
+            parts = action.split(':')
+            stage = profiles.stage(uid)
+            if stage.startswith('modteacher_') and parts[:2] in (['mod','teacherok'], ['mod','teacherreject']):
+                return
+            logic_started = perf_counter()
+            try:
+                text, attachments = await dispatch(uid, parts)
+            finally:
+                LOG.info('callback_logic elapsed_ms=%.1f', (perf_counter() - logic_started) * 1000)
+            await show_screen(uid, text, attachments, callback_message=event.message)
+    except Exception as error:
+        LOG.warning('callback_failed type=%s', type(error).__name__)
+        await notify(uid, 'Не удалось обновить экран. Открой /start для продолжения.')
+    finally:
+        LOG.info('callback_total elapsed_ms=%.1f', (perf_counter() - started) * 1000)
 
 
 async def dispatch(uid,parts):
@@ -856,7 +955,7 @@ async def dispatch(uid,parts):
             if not me(uid) or me(uid)['role']!='teacher':return teacher_screen(uid)
             draft=te.verification_draft(uid)
             field=next((f for f in te.TEACHER_FIELDS if not draft[f]), 'doc')
-            return dispatch(uid,['te','verify',field])
+            return await dispatch(uid,['te','verify',field])
         if sub=='verify':
             if not me(uid) or me(uid)['role']!='teacher':return teacher_screen(uid)
             if me(uid)['teacher_status'] in ('pending','approved'):return teacher_screen(uid)
@@ -1007,6 +1106,7 @@ async def dispatch(uid,parts):
 
 
 @dp.message_created(F.message.body.text)
+@serialized
 async def text_handler(event):
     uid=event.message.sender.user_id
     value=(event.message.body.text or '').strip()
@@ -1014,7 +1114,7 @@ async def text_handler(event):
     stage=profiles.stage(uid)
     if stage == 'role_change_reason':
         if not 5 <= len(value) <= 1000:
-            return await show_screen(event.message.sender.user_id, 'Напиши причину от 5 до 1000 символов.')
+            return await new_screen(event.message.sender.user_id, 'Напиши причину от 5 до 1000 символов.')
         ok, message = rr.submit(uid, value)
         if ok:
             profiles.set_stage(uid, '')
@@ -1023,7 +1123,7 @@ async def text_handler(event):
                 mods=[r['user_id'] for r in db.execute('SELECT user_id FROM moderator_users')]
             for mod in mods:
                 queue_notify(mod,'🔄 Поступила заявка на смену роли.',keyboard([[b('🛡 Посмотреть заявки','mod:roles')]]))
-        return await show_screen(event.message.sender.user_id, text=message,attachments=keyboard([[b('🏠 В меню','home')]]))
+        return await new_screen(event.message.sender.user_id, text=message,attachments=keyboard([[b('🏠 В меню','home')]]))
     if stage == 'event_date_filter':
         try:
             from datetime import datetime as dt
@@ -1032,23 +1132,23 @@ async def text_handler(event):
             chosen=dt.strptime(value,'%d.%m.%y').date()
             flt.update(uid,'period',chosen.isoformat())
         except ValueError:
-            return await show_screen(event.message.sender.user_id, 'Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
+            return await new_screen(event.message.sender.user_id, 'Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
         profiles.set_stage(uid,'')
         text,attachments=flt.screen(uid, 'home')
-        return await show_screen(event.message.sender.user_id, text=text,attachments=attachments)
+        return await new_screen(event.message.sender.user_id, text=text,attachments=attachments)
     if stage.startswith('modrole_'):
         if not te.is_moderator(uid):return
-        if not 3<=len(value)<=1000:return await show_screen(event.message.sender.user_id, 'Напиши причину от 3 до 1000 символов.')
+        if not 3<=len(value)<=1000:return await new_screen(event.message.sender.user_id, 'Напиши причину от 3 до 1000 символов.')
         target,msg=rr.decide(uid,int(stage.split('_')[1]),False,value)
         profiles.set_stage(uid,'')
         if target:queue_notify(target,msg,keyboard([[b('✉ Написать модератору','role:change')],home_btn()]))
         text,attachments=mod_screen(uid,'roles')
-        return await show_screen(event.message.sender.user_id, text=msg+'\n\n'+text,attachments=attachments)
+        return await new_screen(event.message.sender.user_id, text=msg+'\n\n'+text,attachments=attachments)
     if stage.startswith('dmreport_'):
         peer=int(stage.split('_')[1]);profiles.set_stage(uid,'')
         if dm.report(uid,peer,'Другое: '+value[:800]):
-            return await show_screen(event.message.sender.user_id, '🚩 Жалоба отправлена. Общение прекращено.',attachments=keyboard([home_btn()]))
-        return await show_screen(event.message.sender.user_id, 'Не удалось отправить жалобу.',attachments=keyboard([home_btn()]))
+            return await new_screen(event.message.sender.user_id, '🚩 Жалоба отправлена. Общение прекращено.',attachments=keyboard([home_btn()]))
+        return await new_screen(event.message.sender.user_id, 'Не удалось отправить жалобу.',attachments=keyboard([home_btn()]))
     if stage.startswith('dm_'):
         peer=int(stage.split('_')[1])
         ok,msg=dm.send(uid,peer,value)
@@ -1056,25 +1156,25 @@ async def text_handler(event):
             profiles.set_stage(uid,'')
             queue_notify(peer,('📩 Новое сообщение от педагога ' if me(uid)['role']=='teacher' else '💬 Новое сообщение от ')+name(uid)+'!\n\n'+value[:3500],
                 keyboard([[b('✏ Ответить',f'dm:reply:{uid}'),b('🚩 Пожаловаться',f'dm:report:{uid}')]]))
-        return await show_screen(event.message.sender.user_id, text=msg,attachments=keyboard([[b('🤝 Друзья','friend:0')],home_btn()]))
+        return await new_screen(event.message.sender.user_id, text=msg,attachments=keyboard([[b('🤝 Друзья','friend:0')],home_btn()]))
     if stage == 'moderator_code':
         # Обработка отдельно от анкеты: код нельзя сохранить как поле профиля.
         ok, message = te.login_moderator(uid, value)
         if ok:
             profiles.set_stage(uid, '')
             text, attachments = mod_screen(uid)
-            return await show_screen(event.message.sender.user_id, text=message+'\n\n'+text,attachments=attachments)
+            return await new_screen(event.message.sender.user_id, text=message+'\n\n'+text,attachments=attachments)
         if 'заблокирован' in message.lower() or 'не настроен' in message.lower():
             profiles.set_stage(uid, '')
-        return await show_screen(event.message.sender.user_id, text=message, attachments=keyboard([
+        return await new_screen(event.message.sender.user_id, text=message, attachments=keyboard([
             [b('✕ Отмена','mod:cancel_login')],home_btn()]))
     if stage:
         p=me(uid)
         if stage=='city':
-            if not 1<=len(value)<=70:return await show_screen(event.message.sender.user_id, 'Укажи название города до 70 символов.')
+            if not 1<=len(value)<=70:return await new_screen(event.message.sender.user_id, 'Укажи название города до 70 символов.')
             profiles.set_field(uid,'city',value)
         elif stage=='age':
-            if not value.isdigit() or not 3<=int(value)<=100:return await show_screen(event.message.sender.user_id, 'Введи корректный возраст от 3 до 100.')
+            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(event.message.sender.user_id, 'Введи корректный возраст от 3 до 100.')
             profiles.set_field(uid,'age',int(value))
         elif stage.startswith('modteacher_'):
             if not te.is_moderator(uid):return
@@ -1087,7 +1187,7 @@ async def text_handler(event):
         elif stage.startswith('teacher_') and stage!='teacher_doc':
             field=stage[len('teacher_'):]
             if not te.save_verification_field(uid,field,value):
-                return await show_screen(uid, 'Введи от 2 до 150 символов. ФИО указывай минимум из двух слов.')
+                return await new_screen(uid, 'Введи от 2 до 150 символов. ФИО указывай минимум из двух слов.')
             profiles.set_stage(uid,'')
             next_fields=list(te.TEACHER_FIELDS)
             current=next_fields.index(field)
@@ -1095,19 +1195,19 @@ async def text_handler(event):
                 text,attachments=dispatch(uid,['te','verify',next_fields[current+1]])
             else:
                 text,attachments=teacher_screen(uid)
-            return await show_screen(uid,text='✅ Сохранено!\n\n'+text,attachments=attachments)
+            return await new_screen(uid,text='✅ Сохранено!\n\n'+text,attachments=attachments)
         elif stage=='teacher_doc':
             if not te.check_submit(uid,value):
-                return await show_screen(uid, 'Проверь, что ФИО, место работы и должность заполнены, а ссылка начинается с http:// или https://.')
+                return await new_screen(uid, 'Проверь, что ФИО, место работы и должность заполнены, а ссылка начинается с http:// или https://.')
         elif stage.startswith('event_') or stage.startswith('eventedit_'):
             edit=stage.startswith('eventedit_')
             field=stage[len('eventedit_'):] if edit else stage[len('event_'):]
             if field not in te.FIELDS:return
             if field in ('format','tags'):
-                return await show_screen(uid, text='Выбери вариант кнопками.', attachments=event_prompt(uid, field, edit)[1])
+                return await new_screen(uid, text='Выбери вариант кнопками.', attachments=event_prompt(uid, field, edit)[1])
             if field=='url' and not te.valid_url(value):
-                return await show_screen(uid, 'Нужна ссылка, начинающаяся с http:// или https://.')
-            if len(value)>2000:return await show_screen(uid, 'Максимум 2000 символов.')
+                return await new_screen(uid, 'Нужна ссылка, начинающаяся с http:// или https://.')
+            if len(value)>2000:return await new_screen(uid, 'Максимум 2000 символов.')
             te.set_draft(uid,field,value)
         else:return
         profiles.set_stage(uid,'')
@@ -1121,18 +1221,19 @@ async def text_handler(event):
         elif stage.startswith('modevent_'):text,attachments=mod_screen(uid,'events')
         elif stage=='teacher_doc':text,attachments=teacher_screen(uid)
         else:text,attachments=profile_screen(uid)
-        return await show_screen(event.message.sender.user_id, text='✅ Изменения сохранены!\n\n'+text,attachments=attachments)
+        return await new_screen(event.message.sender.user_id, text='✅ Изменения сохранены!\n\n'+text,attachments=attachments)
     peer=social.partner(uid)
     if peer and social.friends(uid,peer) and not social.blocked(uid,peer) and not social.banned(uid) and not social.banned(peer):
-        if len(value)>3800:return await show_screen(event.message.sender.user_id, 'Сообщение слишком длинное (максимум 3800 символов).')
+        if len(value)>3800:return await new_screen(event.message.sender.user_id, 'Сообщение слишком длинное (максимум 3800 символов).')
         RECENT_MESSAGES[social.pair(uid,peer)].append(f'{name(uid)}: {value[:300]}')
         await notify(peer,f'💬 Новое сообщение от {name(uid)}:\n{value}',keyboard([
             [b('✏ Ответить','chat:screen'),b('✕ Завершить','chat:endconfirm')]]))
-        return await show_screen(event.message.sender.user_id, 'Твоё сообщение передано собеседнику. Ждём ответа!',attachments=keyboard([
+        return await new_screen(event.message.sender.user_id, 'Твоё сообщение передано собеседнику. Ждём ответа!',attachments=keyboard([
             [b('✕ Завершить разговор','chat:endconfirm'),b('🚩 Пожаловаться','chat:report')]]))
     text,attachments=menu(uid)
-    await show_screen(event.message.sender.user_id, text='Выбери действие кнопкой.\n'+text,attachments=attachments)
+    await new_screen(event.message.sender.user_id, text='Выбери действие кнопкой.\n'+text,attachments=attachments)
 
 
 if __name__=='__main__':
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s %(message)s')
     asyncio.run(dp.start_polling(bot))
