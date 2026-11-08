@@ -17,7 +17,6 @@ def init():
           PRIMARY KEY(sender,recipient));
           CREATE INDEX IF NOT EXISTS idx_dm_recipient ON direct_messages(recipient);
         ''')
-        db.execute('DELETE FROM direct_messages WHERE sent_at<?',((datetime.now(timezone.utc)-timedelta(days=30)).isoformat(),))
 
 
 def allowed(sender,recipient):
@@ -39,8 +38,9 @@ def allowed(sender,recipient):
 def send(sender,recipient,text):
     text=text.strip()
     if not text or len(text)>3500:return False,'Напиши сообщение от 1 до 3500 символов.'
-    if not allowed(sender,recipient):return False,'Общение с этим пользователем сейчас недоступно.'
     with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if not allowed(sender,recipient):return False,'Общение с этим пользователем сейчас недоступно.'
         db.execute('''INSERT INTO direct_messages(sender,recipient,text,sent_at) VALUES (?,?,?,?)
             ON CONFLICT(sender,recipient) DO UPDATE SET text=excluded.text,sent_at=excluded.sent_at''',
             (sender,recipient,text,now()))
@@ -69,6 +69,4 @@ def report(reporter,reported,reason):
     with connect() as db:
         recent=db.execute('SELECT 1 FROM direct_messages WHERE sender=? AND recipient=?',(reported,reporter)).fetchone()
         if not recent:return False
-    social.report(reporter,reported,reason)
-    clear_pair(reporter,reported)
-    return True
+    return social.report(reporter,reported,reason)

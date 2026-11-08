@@ -24,6 +24,20 @@ def init():
           reason TEXT NOT NULL, state TEXT DEFAULT 'pending', created TEXT NOT NULL);
         ''')
 
+        db.execute('BEGIN IMMEDIATE')
+        columns = {r['name'] for r in db.execute('PRAGMA table_info(interactions_blocked)')}
+        if 'expires_at' not in columns:
+            db.execute('ALTER TABLE interactions_blocked ADD COLUMN expires_at TEXT')
+            for row in db.execute('SELECT blocker,blocked FROM interactions_blocked').fetchall():
+                report = db.execute('SELECT created FROM reports WHERE reporter=? AND reported=? ORDER BY created DESC LIMIT 1', tuple(row)).fetchone()
+                try:
+                    started = datetime.fromisoformat(report['created']) if report else UTC()
+                    if started.tzinfo is None: started = started.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    started = UTC()
+                db.execute('UPDATE interactions_blocked SET expires_at=? WHERE blocker=? AND blocked=?',
+                           ((started.astimezone(timezone.utc) + timedelta(days=7)).isoformat(), *tuple(row)))
+
 def pair(a,b): return (min(a,b),max(a,b))
 def banned(uid):
     with connect() as db:
@@ -31,7 +45,7 @@ def banned(uid):
 
 def blocked(a,b):
     with connect() as db:
-        return db.execute('SELECT 1 FROM interactions_blocked WHERE blocker IN (?,?) AND blocked IN (?,?) AND blocker!=blocked',(a,b,a,b)).fetchone() is not None
+        return db.execute('SELECT 1 FROM interactions_blocked WHERE blocker IN (?,?) AND blocked IN (?,?) AND blocker!=blocked AND (expires_at IS NULL OR expires_at>?)',(a,b,a,b,UTC().isoformat())).fetchone() is not None
 
 def friends(a,b):
     with connect() as db:
@@ -65,6 +79,7 @@ def pending(uid, incoming=True):
 
 def decision(recipient,sender,approve):
     with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
         old=db.execute('SELECT status FROM friendship_requests WHERE sender=? AND recipient=?',(sender,recipient)).fetchone()
         if not old or old['status']!='pending': return 'Эта заявка уже обработана.'
         if banned(sender) or banned(recipient) or blocked(sender,recipient): return 'Общение недоступно.'
@@ -100,8 +115,9 @@ def partner(uid):
     return (c['uid2'] if c['uid1']==uid else c['uid1']) if c else None
 
 def start(a,b):
-    if not friends(a,b) or banned(a) or banned(b) or blocked(a,b): return 'Общение недоступно.'
     with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if not friends(a,b) or banned(a) or banned(b) or blocked(a,b): return 'Общение недоступно.'
         busy=db.execute('SELECT 1 FROM conversations WHERE uid1 IN (?,?) OR uid2 IN (?,?)',(a,b,a,b)).fetchone()
         if busy: return '💬 Один из участников уже общается.'
         db.execute('INSERT INTO conversations VALUES (?,?,?)',(*pair(a,b),UTC().isoformat()))
@@ -113,9 +129,13 @@ def end(uid):
         return bool(r.rowcount)
 
 def report(reporter,reported,reason):
-    if not isinstance(reason,str) or not 1<=len(reason)<=1000: return False
+    if reporter == reported or not isinstance(reason,str) or not 1<=len(reason.strip())<=1000: return False
     with connect() as db:
-        db.execute('INSERT OR IGNORE INTO interactions_blocked VALUES (?,?)',(reporter,reported))
+        db.execute('BEGIN IMMEDIATE')
+        if blocked(reporter, reported): return False
+        db.execute('INSERT INTO interactions_blocked(blocker,blocked,expires_at) VALUES (?,?,?) '
+                   'ON CONFLICT(blocker,blocked) DO UPDATE SET expires_at=excluded.expires_at',
+                   (reporter,reported,(UTC()+timedelta(days=7)).isoformat()))
         db.execute('DELETE FROM conversations WHERE uid1=? AND uid2=?',pair(reporter,reported))
         db.execute('DELETE FROM friendships WHERE uid1=? AND uid2=?',pair(reporter,reported))
         db.execute("UPDATE friendship_requests SET status='cancelled' WHERE status='pending' AND ((sender=? AND recipient=?) OR (sender=? AND recipient=?))",(reporter,reported,reported,reporter))

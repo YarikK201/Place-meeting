@@ -575,7 +575,7 @@ def draft_screen(uid,mode='auto'):
                   [b('◀️ Назад','home')]])
 
 
-def mod_screen(uid,which='home'):
+def mod_screen(uid,which='home',page=0):
     if not te.is_moderator(uid):return ui('⛔ Нет доступа к модерации.',[home_btn()])
     if which=='home':return ui('🛡 Меню модератора',[
         [b('👩‍🏫 Проверка педагогов','mod:teachers'),b('📅 Проверка мероприятий','mod:events')],
@@ -611,9 +611,10 @@ def mod_screen(uid,which='home'):
             [b('✅ Опубликовать',f'mod:eventok:{r["id"]}'),b('✕ Отклонить',f'mod:eventreject:{r["id"]}')],
             [b('◀ Назад','mod:home')]])
     if which=='published':
-        with connect() as db: found=db.execute("SELECT id,title FROM events WHERE status IS NULL OR status!='hidden' ORDER BY id DESC LIMIT 15").fetchall()
-        return ui('📅 Опубликованные события (последние 15):',
-            [[b(f'🚫 {str(r["title"])[:45]}',f'mod:hideconfirm:{r["id"]}')] for r in found]+[[b('◀ Назад','mod:home')]])
+        with connect() as db: found=db.execute("SELECT id,title,status FROM events WHERE status IS NULL OR status IN ('published','hidden') ORDER BY id DESC LIMIT 16 OFFSET ?",(max(0,page)*15,)).fetchall()
+        return ui('📅 Опубликованные и скрытые события:',
+            [[b(('👁 Восстановить ' if r['status']=='hidden' else '🚫 Скрыть ')+str(r['title'])[:40],
+                f"mod:{'restore' if r['status']=='hidden' else 'hideconfirm'}:{r['id']}")] for r in found[:15]]+[[b('◀ Предыдущие',f'mod:published:{page-1}')] if page else [], [b('Следующие ▶',f'mod:published:{page+1}')] if len(found)>15 else [], [b('◀ Назад','mod:home')]])
     if which=='reports':
         with connect() as db: found=db.execute("SELECT * FROM reports WHERE state='pending' ORDER BY id").fetchall()
         if not found:return ui('Жалоб на проверке нет.',[[b('◀ Назад','mod:home')]])
@@ -640,6 +641,26 @@ async def notify(uid, text, attachments=None):
 
 
 _NOTIFY_TASKS = set()
+
+
+def remember_sender(user):
+    profile=me(user.user_id)
+    if profile and profile['role']=='student':
+        display=' '.join(filter(None, [getattr(user,'first_name',None),getattr(user,'last_name',None)]))
+        if display: profiles.set_field(user.user_id,'name',display[:100])
+
+
+def report_notice(reporter, reported, reason, notify_moderators=True):
+    # Автор получает подтверждение текущим экраном; адресату — отдельное уведомление.
+    queue_notify(reported, f'{name(reporter)} подал жалобу модератору. Причина: {reason}. '
+                 'Общение с данным пользователем прекращено и будет недоступно в течение следующих 7 дней. '
+                 'Вы удалены из списка его друзей', keyboard([home_btn()]))
+    if notify_moderators:
+        with connect() as db:
+            moderators=db.execute('SELECT user_id FROM moderator_users').fetchall()
+        for row in moderators:
+            queue_notify(row['user_id'],'🚩 Поступила жалоба. Откройте список для рассмотрения.',
+                         keyboard([[b('🛡 Жалобы','mod:reports')]]))
 
 
 def queue_notify(uid, text, attachments=None):
@@ -737,6 +758,7 @@ async def callback(event):
                     return
                 # Одно поколение кнопок применяем ровно один раз, даже при ошибке API.
                 db.execute("UPDATE ui_callbacks SET revision='' WHERE user_id=? AND message_id=?", (uid, mid))
+            remember_sender(event.callback.user)
             parts = action.split(':')
             stage = profiles.stage(uid)
             if stage.startswith('modteacher_') and parts[:2] in (['mod','teacherok'], ['mod','teacherreject']):
@@ -901,6 +923,7 @@ async def dispatch(uid,parts):
                 profiles.set_stage(uid,'dmreport_'+str(peer))
                 return ui('Напиши причину жалобы одним сообщением.',[[b('◀ Отмена','home')]])
             success=dm.report(uid,peer,opts[idx])
+            if success: report_notice(uid,peer,opts[idx])
             return ui('🚩 Жалоба отправлена модератору. Общение с пользователем прекращено.' if success else 'Жалоба недоступна.',[home_btn()])
     if act=='req':
         sub=parts[1]
@@ -941,7 +964,8 @@ async def dispatch(uid,parts):
             if not peer:return ui('Разговор уже завершён.',[home_btn()])
             options=['Неприемлемые сообщения','Оскорбления','Спам','Другое'];reason=options[int(parts[2])]
             history='\n'.join(RECENT_MESSAGES.get(social.pair(uid,peer),[]))
-            social.report(uid,peer,reason)
+            if not social.report(uid,peer,reason):return ui('Жалоба уже отправлена или недоступна.',[home_btn()])
+            report_notice(uid,peer,reason,notify_moderators=False)
             with connect() as db:
                 moderators=[r['user_id'] for r in db.execute('SELECT user_id FROM moderator_users')]
             for mid in moderators:
@@ -974,7 +998,7 @@ async def dispatch(uid,parts):
             return ui(prompts[field],[[b('◀ Назад','te:check')]])
         if sub=='new':
             if not te.is_teacher(uid):return teacher_screen(uid)
-            te.start_draft(uid)
+            if not te.start_draft(uid):return ui('Сначала завершите текущий черновик.',[home_btn()])
             return draft_screen(uid)
         if sub in ('field','editfield'):
             if not te.is_teacher(uid):return teacher_screen(uid)
@@ -1032,31 +1056,30 @@ async def dispatch(uid,parts):
             rows=te.my_events(uid)
             if not rows:return ui('🗂 Вы пока не добавили мероприятий.',[[b('➕ Добавить','te:new')],home_btn()])
             return ui('🗂 Мои мероприятия',[
-                [b(f'#{r["id"]}: {r["status"]}',f'te:view:{r["id"]}')] for r in rows[:20]]+[[b('➕ Добавить','te:new')],home_btn()])
+                [b(f'#{r["id"]}: {te.status_label(r)}',f'te:view:{r["id"]}')] for r in rows[:20]]+[[b('➕ Добавить','te:new')],home_btn()])
         if sub=='view':
             id=int(parts[2]);found=[r for r in te.my_events(uid) if r['id']==id]
             if not found:return ui('Не найдено.',[[b('◀ Назад','te:mine')]])
             r=found[0]
-            return ui(f'🗂 Событие №{id}\nСтатус: {r["status"]}\n{r["draft"]}\nЗамечания: {r["comment"]}',[
-                [b('✏ Исправить',f'te:redo:{id}')] if r['status'] in ('rejected','published') else [],
+            return ui(f'🗂 Событие №{id}\nСтатус: {te.status_label(r)}\n{r["draft"]}\nЗамечания: {r["comment"]}',[
+                [b('✏ Исправить',f'te:redo:{id}')] if r['status'] in ('rejected','published','draft') else [],
                 [b('◀ Назад','te:mine')]])
         if sub=='redo':
             if not te.is_teacher(uid):return teacher_screen(uid)
             target=int(parts[2]);found=[r for r in te.my_events(uid) if r['id']==target]
             if not found:return menu(uid)
             r=found[0]
-            if r['status']=='published':
-                if not r['event_id']: return ui('Не удалось найти опубликованную версию.',[[b('◀ Назад','te:mine')]])
+            if r['event_id']:
                 if not te.start_draft(uid,r['event_id']):
                     return ui('Данное мероприятие ещё рассматривается модератором. Дождитесь решения.',[[b('◀ Назад','te:mine')]])
                 return draft_screen(uid)
-            with connect() as db:
-                db.execute("UPDATE proposed_events SET status='draft' WHERE teacher_id=? AND id=? AND status='rejected'",(uid,target))
+            if r['status']=='draft':return draft_screen(uid)
+            if not te.resume_rejected(uid,target):return ui('Сначала завершите текущий черновик.',[home_btn()])
             return draft_screen(uid)
     if act=='mod':
         if not te.is_moderator(uid):return ui('Нет доступа.',[home_btn()])
         sub=parts[1]
-        if sub in ('home','teachers','events','reports','blocks','published','roles'):return mod_screen(uid,sub)
+        if sub in ('home','teachers','events','reports','blocks','published','roles'):return mod_screen(uid,sub,int(parts[2]) if sub=='published' and len(parts)>2 else 0)
         if sub=='rolereject':
             profiles.set_stage(uid,'modrole_'+parts[2])
             return ui('✏ Напиши причину отклонения заявки на смену роли:',[[b('◀ Назад','mod:roles')]])
@@ -1070,10 +1093,11 @@ async def dispatch(uid,parts):
             return ui(message,[[b('🔄 Следующая заявка','mod:roles')],[b('◀ Меню модератора','mod:home')]])
         if sub=='hideconfirm':
             return ui('🚫 Скрыть мероприятие из каталога?',[[b('✅ Скрыть',f'mod:hide:{parts[2]}'),b('◀ Назад','mod:published')]])
-        if sub=='hide':
-            with connect() as db:db.execute("UPDATE events SET status='hidden' WHERE id=?",(int(parts[2]),))
+        if sub in ('hide','restore'):
+            ok=te.set_visibility(uid,int(parts[2]),sub=='hide')
             flt.invalidate_events()
-            return ui('✅ Мероприятие скрыто.',[[b('📅 К мероприятиям','mod:published')]])
+            return ui(('✅ Мероприятие скрыто.' if sub=='hide' else '✅ Мероприятие восстановлено.') if ok else 'Мероприятие недоступно.',
+                      [[b('📅 К мероприятиям','mod:published')]])
         if sub=='teacherreject':
             profiles.set_stage(uid,'modteacher_'+parts[2])
             return ui('✏ Отправь комментарий к причине отклонения одним сообщением.',[[b('◀ Назад','mod:teachers')]])
@@ -1088,7 +1112,8 @@ async def dispatch(uid,parts):
             target=te.decide_event(uid,int(parts[2]),True)
             if target:
                 flt.invalidate_events()
-                queue_notify(target,'✅ Мероприятие опубликовано!')
+                queue_notify(target,'✅ Заявка на мероприятие одобрена. Видимость мероприятия сохранена.',keyboard([[b('🗂 Мои мероприятия','te:mine')],home_btn()]))
+            else:return ui('Заявка уже обработана либо обнаружен конфликт ссылки или владельца. Проверьте заявку.',[[b('◀ Назад','mod:events')]])
             return mod_screen(uid,'events')
         if sub=='close':
             with connect() as db:db.execute("UPDATE reports SET state='closed' WHERE id=? AND state='pending'",(int(parts[2]),))
@@ -1109,6 +1134,7 @@ async def dispatch(uid,parts):
 @serialized
 async def text_handler(event):
     uid=event.message.sender.user_id
+    remember_sender(event.message.sender)
     value=(event.message.body.text or '').strip()
     if not value or value.startswith('/'):return
     stage=profiles.stage(uid)
@@ -1147,6 +1173,7 @@ async def text_handler(event):
     if stage.startswith('dmreport_'):
         peer=int(stage.split('_')[1]);profiles.set_stage(uid,'')
         if dm.report(uid,peer,'Другое: '+value[:800]):
+            report_notice(uid,peer,'Другое: '+value[:800])
             return await new_screen(event.message.sender.user_id, '🚩 Жалоба отправлена. Общение прекращено.',attachments=keyboard([home_btn()]))
         return await new_screen(event.message.sender.user_id, 'Не удалось отправить жалобу.',attachments=keyboard([home_btn()]))
     if stage.startswith('dm_'):
@@ -1183,7 +1210,7 @@ async def text_handler(event):
         elif stage.startswith('modevent_'):
             if not te.is_moderator(uid):return
             target=te.decide_event(uid,int(stage.split('_')[1]),False,value[:1000])
-            if target:await notify(target,'✕ Мероприятие отклонено. Замечания: '+value[:1000])
+            if target:await notify(target,'✕ Заявка на мероприятие отклонена. Ранее опубликованная версия сохранена, если она была. Замечания: '+value[:1000],keyboard([[b('🗂 Мои мероприятия','te:mine')],home_btn()]))
         elif stage.startswith('teacher_') and stage!='teacher_doc':
             field=stage[len('teacher_'):]
             if not te.save_verification_field(uid,field,value):

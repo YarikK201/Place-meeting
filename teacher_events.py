@@ -47,6 +47,17 @@ def init():
             locked_until TEXT
         )""")
 
+        db.execute('BEGIN IMMEDIATE')
+        event_columns = {r['name'] for r in db.execute('PRAGMA table_info(events)')}
+        if 'owner_id' not in event_columns:
+            db.execute('ALTER TABLE events ADD COLUMN owner_id INTEGER')
+            # Назначаем владельца только при однозначной истории публикаций.
+            db.execute("""UPDATE events SET owner_id=(
+                SELECT MIN(teacher_id) FROM proposed_events p
+                WHERE p.event_id=events.id AND p.status='published')
+                WHERE id IN (SELECT event_id FROM proposed_events WHERE status='published'
+                    GROUP BY event_id HAVING COUNT(DISTINCT teacher_id)=1)""")
+
 # Код доступа должен быть задан администратором в окружении контейнера,
 # а не храниться в исходниках или базе данных.
 def code_configured():
@@ -170,13 +181,17 @@ def draft(uid):
 def start_draft(uid,event_id=None):
     if not is_teacher(uid): return None
     with connect() as db:
-        existing=draft(uid)
-        if existing: return existing['id']
-        if event_id and db.execute("SELECT 1 FROM proposed_events WHERE teacher_id=? AND event_id=? AND status='pending'",(uid,event_id)).fetchone():return None
+        db.execute('BEGIN IMMEDIATE')
         data={}
-        if event_id:
-            e=db.execute('SELECT * FROM events WHERE id=?',(event_id,)).fetchone()
-            if e: data={field: e[field] for field in FIELDS}
+        if event_id is not None:
+            e=db.execute('SELECT * FROM events WHERE id=? AND owner_id=?',(event_id,uid)).fetchone()
+            if not e: return None
+            if db.execute("SELECT 1 FROM proposed_events WHERE event_id=? AND status='pending'",(event_id,)).fetchone(): return None
+            data={field: e[field] for field in FIELDS}
+            data['tags']=json.loads(data['tags'] or '[]')
+        existing=draft(uid)
+        if existing:
+            return existing['id'] if existing['event_id']==event_id else None
         c=db.execute('INSERT INTO proposed_events(teacher_id,event_id,draft,created) VALUES (?,?,?,?)',
                      (uid,event_id,json.dumps(data,ensure_ascii=False),datetime.now(timezone.utc).isoformat()))
         return c.lastrowid
@@ -190,16 +205,19 @@ def set_draft(uid,field,value):
     return True
 
 def send_review(uid):
-    r=draft(uid)
-    if not r: return False
-    data=json.loads(r['draft'])
-    if any(not data.get(f) for f in FIELDS) or not valid_url(data['url']):return False
-    if data.get('format') not in ('онлайн','офлайн') or not isinstance(data.get('tags'),list):return False
-    if not data['tags'] or any(tag not in ALL_TAGS for tag in data['tags']):return False
-    digest=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-    if r['review_hash']==digest:return False
+    if not is_teacher(uid): return False
     with connect() as db:
-        if r['event_id'] and db.execute("SELECT 1 FROM proposed_events WHERE event_id=? AND status='pending'",(r['event_id'],)).fetchone():return False
+        db.execute('BEGIN IMMEDIATE')
+        r=db.execute("SELECT * FROM proposed_events WHERE teacher_id=? AND status='draft' ORDER BY id DESC LIMIT 1",(uid,)).fetchone()
+        if not r: return False
+        data=json.loads(r['draft'])
+        if any(not data.get(f) for f in FIELDS) or not valid_url(data['url']):return False
+        if data.get('format') not in ('онлайн','офлайн') or not isinstance(data.get('tags'),list):return False
+        if any(tag not in ALL_TAGS for tag in data['tags']):return False
+        if r['event_id']:
+            if not db.execute('SELECT 1 FROM events WHERE id=? AND owner_id=?',(r['event_id'],uid)).fetchone():return False
+            if db.execute("SELECT 1 FROM proposed_events WHERE event_id=? AND status='pending'",(r['event_id'],)).fetchone():return False
+        digest=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         db.execute("UPDATE proposed_events SET status='pending',review_hash=? WHERE id=?",(digest,r['id']))
     return True
 
@@ -207,27 +225,62 @@ def pending_events():
     with connect() as db:return db.execute("SELECT * FROM proposed_events WHERE status='pending' ORDER BY id").fetchall()
 
 def decide_event(mod,id,approve,comment=''):
-    if not is_moderator(mod):return None
     with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if not db.execute('SELECT 1 FROM moderator_users WHERE user_id=?',(mod,)).fetchone():return None
         r=db.execute("SELECT * FROM proposed_events WHERE id=? AND status='pending'",(id,)).fetchone()
         if not r:return None
         data=json.loads(r['draft'])
         if approve:
+            if r['event_id'] and not db.execute('SELECT 1 FROM events WHERE id=? AND owner_id=?',
+                                                (r['event_id'],r['teacher_id'])).fetchone():return None
+            conflict=db.execute('SELECT id FROM events WHERE url=?',(data['url'],)).fetchone()
+            if conflict and conflict['id'] != r['event_id']:return None
             values=(data['url'],data['title'],data['description'],data['date'],data['place'],data['format'],
-                json.dumps(normalize(data['tags']),ensure_ascii=False))
+                    json.dumps(normalize(data['tags']),ensure_ascii=False))
             if r['event_id']:
-                db.execute('''UPDATE events SET url=?,title=?,description=?,date=?,place=?,format=?,tags=?,status='published'
-                    WHERE id=?''',(*values,r['event_id']))
+                # Видимость независима от решения по правкам: скрытое остаётся скрытым.
+                db.execute('UPDATE events SET url=?,title=?,description=?,date=?,place=?,format=?,tags=? WHERE id=?',
+                           (*values,r['event_id']))
             else:
-                db.execute('''INSERT INTO events(url,title,description,date,place,format,tags,status)
-                    VALUES (?,?,?,?,?,?,?,'published') ON CONFLICT(url) DO UPDATE SET
-                    title=excluded.title,description=excluded.description,date=excluded.date,
-                    place=excluded.place,format=excluded.format,tags=excluded.tags,status='published' ''',values)
-        if approve:
-            linked=db.execute('SELECT id FROM events WHERE url=?',(data['url'],)).fetchone()
-            if linked: db.execute('UPDATE proposed_events SET event_id=? WHERE id=?',(linked['id'],id))
+                result=db.execute("INSERT INTO events(url,title,description,date,place,format,tags,status,owner_id) VALUES (?,?,?,?,?,?,?,'published',?)",
+                                  (*values,r['teacher_id']))
+                db.execute('UPDATE proposed_events SET event_id=? WHERE id=?',(result.lastrowid,id))
         db.execute('UPDATE proposed_events SET status=?,comment=? WHERE id=?',('published' if approve else 'rejected',comment,id))
         return r['teacher_id']
 
+
+def set_visibility(mod,event_id,hidden):
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if not db.execute('SELECT 1 FROM moderator_users WHERE user_id=?',(mod,)).fetchone():return False
+        result=db.execute("UPDATE events SET status=? WHERE id=? AND (status IS NULL OR status IN ('published','hidden'))",
+                          ('hidden' if hidden else 'published',event_id))
+        return bool(result.rowcount)
+
+
 def my_events(uid):
-    with connect() as db:return db.execute('SELECT * FROM proposed_events WHERE teacher_id=? ORDER BY id DESC',(uid,)).fetchall()
+    with connect() as db:
+        rows=db.execute('SELECT p.*, e.status AS visibility FROM proposed_events p LEFT JOIN events e ON e.id=p.event_id WHERE p.teacher_id=? ORDER BY p.id DESC',(uid,)).fetchall()
+    # Одна карточка на мероприятие; последняя заявка содержит текущие замечания.
+    found=[];seen=set()
+    for row in rows:
+        key=('event',row['event_id']) if row['event_id'] else ('request',row['id'])
+        if key not in seen: found.append(row);seen.add(key)
+    return found
+
+
+def status_label(row):
+    if row['status']=='pending':return 'На рассмотрении'
+    if row['visibility']=='hidden':return 'Скрыт'
+    if row['visibility']=='published':return 'Опубликовано'
+    return {'draft':'Черновик','rejected':'Отклонено','published':'Опубликовано'}.get(row['status'],row['status'])
+
+
+def resume_rejected(uid, request_id):
+    if not is_teacher(uid):return False
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if db.execute("SELECT 1 FROM proposed_events WHERE teacher_id=? AND status='draft'",(uid,)).fetchone():return False
+        result=db.execute("UPDATE proposed_events SET status='draft' WHERE teacher_id=? AND id=? AND status='rejected' AND event_id IS NULL",(uid,request_id))
+        return bool(result.rowcount)
