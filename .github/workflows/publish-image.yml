@@ -1,0 +1,60 @@
+name: Publish Docker image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run technical checks without MAX access
+        run: |
+          docker build -t place-meeting-ci .
+          docker run --rm --network none --entrypoint python place-meeting-ci -m pip check
+          docker run --rm -i --network none --entrypoint python place-meeting-ci - <<'PY'
+          import importlib
+          import os
+          from pathlib import Path
+          import tempfile
+
+          sources = sorted(Path('/app').glob('*.py'))
+          for source in sources:
+              compile(source.read_bytes(), str(source), 'exec')
+          with tempfile.TemporaryDirectory() as directory:
+              os.environ['MAX_BOT_TOKEN'] = 'offline-check'
+              os.environ['EVENTS_DB'] = directory + '/events.db'
+              for source in sources:
+                  importlib.import_module(source.stem)
+          print('Python syntax and module imports OK; user scenarios not checked')
+          PY
+          MAX_BOT_TOKEN=offline-test MODERATOR_ACCESS_CODE=offline-test-code docker compose config --quiet
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish image after technical checks
+        env:
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}"
+          docker tag place-meeting-ci "$image:dev"
+          docker tag place-meeting-ci "$image:sha-$COMMIT_SHA"
+          docker push "$image:sha-$COMMIT_SHA"
+          docker push "$image:dev"

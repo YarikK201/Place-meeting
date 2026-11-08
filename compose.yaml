@@ -1,0 +1,23 @@
+name: place-meeting
+
+services:
+  bot:
+    image: ${BOT_IMAGE:-place-meeting-bot:dev}
+    build: .
+    container_name: place-meeting
+    restart: unless-stopped
+    environment:
+      MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:?Set MAX_BOT_TOKEN in .env or environment}
+      MODERATOR_ACCESS_CODE: ${MODERATOR_ACCESS_CODE:?Set MODERATOR_ACCESS_CODE in .env or environment}
+      EVENTS_DB: /data/events_v2.db
+    volumes:
+      - bot-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot-data:
+    name: place-meeting-data
