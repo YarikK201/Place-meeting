@@ -5,7 +5,7 @@ import os
 import logging
 from copy import deepcopy
 from functools import wraps
-from time import perf_counter
+from time import perf_counter, time
 from uuid import uuid4
 from maxapi.exceptions import MaxApiError
 from collections import defaultdict, deque
@@ -678,14 +678,38 @@ def queue_notify(uid, text, attachments=None):
     task.add_done_callback(_NOTIFY_TASKS.discard)
 
 
+async def open_bot(user, *, system_timestamp=None):
+    """Вызывается под блокировкой пользователя: меню и приветствие не гоняются."""
+    uid=user.user_id
+    data=profiles.ui_data(uid)
+    if system_timestamp is not None:
+        if system_timestamp <= data.get('last_bot_started', -1):
+            return
+        # Запоминаем до отправки: после сетевого таймаута доставка могла состояться.
+        data['last_bot_started']=system_timestamp
+    recent=time()-data.get('last_open_at',0)<3
+    data['last_open_at']=time()
+    profiles.save_ui_data(uid,data)
+    remember_sender(user)
+    text,attachments=menu(uid) if me(uid) else role_screen(uid)
+    await show_screen(uid,text,attachments,
+                      force_new=system_timestamp is None and not recent)
+
+
+@dp.bot_started()
+async def bot_started(event):
+    async with _ACTION_LOCKS[event.user.user_id]:
+        try:
+            await open_bot(event.user,system_timestamp=event.timestamp)
+        except Exception as error:
+            # Не отправляем повторное приветствие при неопределённом исходе API.
+            LOG.warning('bot_start_failed type=%s',type(error).__name__)
+
+
 @dp.message_created(Command('start'))
 @serialized
 async def start(event):
-    uid=event.message.sender.user_id
-    text,attachments=role_screen(uid)
-    if social.partner(uid): text,attachments=ui('💬 У тебя есть активный разговор. Хочешь продолжить или завершить его?',[
-        [b('💬 Продолжить','chat:screen'),b('✕ Завершить','chat:endconfirm')],home_btn()])
-    await show_screen(event.message.sender.user_id, text=text,attachments=attachments,force_new=True)
+    await open_bot(event.message.sender)
 
 @dp.message_created(Command('catalog'))
 @serialized
