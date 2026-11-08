@@ -267,8 +267,6 @@ def menu(uid):
         if social.pending(uid, True) or social.pending(uid, False):
             rows.insert(-1,[b('📩 Заявки','req:in:0')])
     if te.is_moderator(uid): rows.append([b('🛡 Модерация','mod:home')])
-    # Смену роли можно запросить через повторный /start.
-    if not p or p['role']!='teacher':rows.append([b('🔄 Сменить роль','role:change')])
     return ui('🏠 Главное меню',rows)
 
 
@@ -710,6 +708,16 @@ async def bot_started(event):
 @serialized
 async def start(event):
     await open_bot(event.message.sender)
+
+
+@dp.message_created(Command('role'))
+@serialized
+async def role_cmd(event):
+    uid = event.message.sender.user_id
+    profiles.set_stage(uid, '')
+    text, attachments = role_screen(uid)
+    await show_screen(uid, text, attachments, force_new=True)
+
 
 @dp.message_created(Command('catalog'))
 @serialized

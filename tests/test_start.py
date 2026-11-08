@@ -71,3 +71,39 @@ class StartTests(NavigationCase):
     async def test_different_users_independent(self):
         await asyncio.gather(app.bot_started(self.event(1)),app.bot_started(self.event(2)))
         self.assertNotEqual(app.screen_id(1),app.screen_id(2))
+
+    async def test_role_command_for_student_and_teacher(self):
+        for uid, role in [(1, 'student'), (2, 'teacher')]:
+            with self.subTest(role=role):
+                app.profiles.choose(uid, role)
+                old_mid = await self.screen(uid)
+                app.profiles.set_stage(uid, 'city')
+                await app.role_cmd(self.command(uid))
+                mid = app.screen_id(uid)
+                self.assertNotEqual(mid, old_mid)
+                self.assertEqual(app.profiles.stage(uid), '')
+                buttons = self.transport.send_message.call_args.kwargs['attachments'][0].payload.buttons
+                self.assertTrue(buttons[0][0].payload.endswith(':role:select'))
+                await app.callback(self.click(uid, mid, 'role:select'))
+                self.assertEqual(app.profiles.stage(uid), 'role_change_reason')
+                event = NS(message=NS(sender=NS(user_id=uid), body=NS(text='Хочу сменить роль')))
+                await app.text_handler(event)
+                request = app.rr.pending_for_user(uid)
+                self.assertEqual(request['from_role'], role)
+                self.assertEqual(request['to_role'], 'teacher' if role == 'student' else 'student')
+                self.assertEqual(app.profiles.get(uid)['role'], role)
+                await app.role_cmd(self.command(uid))
+                self.assertIn('уже на рассмотрении', self.transport.send_message.call_args.kwargs['text'])
+                self.assertEqual(app.rr.pending_for_user(uid)['id'], request['id'])
+
+    async def test_role_command_new_user(self):
+        await app.role_cmd(self.command())
+        self.assertIn('Привет', self.transport.send_message.call_args.kwargs['text'])
+        self.assertIsNone(app.rr.pending_for_user(1))
+
+    async def test_role_change_not_in_main_menu(self):
+        for uid, role in [(1, 'student'), (2, 'teacher')]:
+            app.profiles.choose(uid, role)
+            _, attachments = app.menu(uid)
+            buttons = [button for row in attachments[0].payload.buttons for button in row]
+            self.assertFalse(any(button.payload == 'role:change' for button in buttons))
