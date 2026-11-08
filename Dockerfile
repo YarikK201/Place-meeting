@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source="https://github.com/YarikK201/Place-meetin
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt constraints.txt ./
+COPY requirements.txt ./
 # Необязательный CA прокси сборки; сертификат не сохраняется в образе.
 RUN --mount=type=secret,id=build_ca \
     if [ -f /run/secrets/build_ca ]; then \
