@@ -16,6 +16,7 @@ from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from catalog import connect
 import profiles, people, social, teacher_events as te, filters as flt, favorites as fav, role_requests as rr, direct_messages as dm
 import event_tags as et
+from presentation import Markdown, event_text, parse_teacher_date, escape
 
 bot = Bot(os.environ['MAX_BOT_TOKEN'])
 dp = Dispatcher()
@@ -55,6 +56,7 @@ def serialized(handler):
     async def wrapped(event):
         async with _ACTION_LOCKS[event.message.sender.user_id]:
             try:
+                remember_sender(event.message.sender)
                 return await handler(event)
             except Exception as error:
                 LOG.warning("handler_failed type=%s", type(error).__name__)
@@ -182,7 +184,7 @@ async def show_screen(uid, text, attachments=None, callback_message=None, force_
         if mid and not force_new:
             try:
                 result = await api_call('edit_message', message_id=mid, text=text[:3999],
-                                        attachments=buttons, notify=False)
+                                        attachments=buttons, notify=False, format='markdown' if isinstance(text,Markdown) else None)
             except MaxApiError as error:
                 # Только достоверное отсутствие сообщения разрешает замену.
                 if error.code != 404:
@@ -192,7 +194,7 @@ async def show_screen(uid, text, attachments=None, callback_message=None, force_
                 save_revision(uid, mid, revision)
                 queue_cleanup(uid)
                 return result
-        sent = await api_call('send_message', user_id=uid, text=text[:3999], attachments=buttons)
+        sent = await api_call('send_message', user_id=uid, text=text[:3999], attachments=buttons, format='markdown' if isinstance(text,Markdown) else None)
         new_mid = sent_id(sent)
         if not new_mid:
             raise RuntimeError('MAX response has no message ID')
@@ -234,6 +236,11 @@ def name(uid):
     profile = me(uid)
     return profile['name'] if profile and profile['name'] else 'Участник'
 
+def contact_name(uid):
+    p=me(uid)
+    return people.card_text(p) if p and p['role']=='teacher' and p['teacher_status']=='approved' else name(uid)
+
+
 def ready(uid):
     p=me(uid)
     if p and p['role']=='teacher':
@@ -249,8 +256,8 @@ def profile_button(uid):
 def menu(uid):
     p=me(uid)
     if p and p['role']=='teacher':
-        rows=[[b('📅 Мероприятия','card:0'),b('👥 Найти участников','p:student:0')],
-              [b('➕ Добавить мероприятие','te:new'),b('🗂 Мои мероприятия','te:mine')],
+        rows=[[b('📅 Мероприятия','card:0')],[b('👥 Найти участников','p:student:0')],
+              [b('➕ Добавить мероприятие','te:new')],[b('🗂 Мои мероприятия','te:mine')],
               [b('📩 Отправленные сообщения','dm:sent:0')]]
         if p['teacher_status']!='approved': rows.insert(0,[b('👩‍🏫 Подтвердить статус','te:check')])
     else:
@@ -261,7 +268,7 @@ def menu(uid):
             rows.insert(-1,[b('📩 Заявки','req:in:0')])
     if te.is_moderator(uid): rows.append([b('🛡 Модерация','mod:home')])
     # Смену роли можно запросить через повторный /start.
-    rows.append([b('🔄 Сменить роль','role:change')])
+    if not p or p['role']!='teacher':rows.append([b('🔄 Сменить роль','role:change')])
     return ui('🏠 Главное меню',rows)
 
 
@@ -273,7 +280,7 @@ def role_screen(uid):
         if request:
             return ui(f'Твоя текущая роль: {role}.\n⏳ Заявка №{request["id"]} уже на рассмотрении модератора. До решения роль не меняется.', [[b('🏠 Назад','home')]])
         return ui(f'Ваша текущая роль: {role}. Чтобы подать заявку на смену роли, обратитесь к модератору.', [
-            [b('✉ Написать модератору','role:select'),b('◀ Назад','home')]])
+            [b('✉ Написать модератору','role:select')],[b('◀ Назад','home')]])
     return ui('👋 Привет! Это «Место встречи»!\nЗдесь можно находить интересные мероприятия, знакомиться с единомышленниками и собирать команды для общих идей.\nДля начала расскажи, кто ты.',[
         [b('🎒 Я школьник','role:student'),b('👩‍🏫 Я педагог','role:teacher')]])
 
@@ -297,24 +304,37 @@ def profile_screen(uid):
 
 
 def edit_menu():
-    return ui('✏ Что хочешь изменить?',[
+    return ui('✏️ Что хочешь изменить?',[
         [b('📍 Город','profile:field:city'),b('🎂 Возраст','profile:field:age')],
         [b('💡 Интересы','profile:field:interests'),b('🛠 Навыки','profile:field:skills')],
         [b('◀ Назад', 'profile')]])
 
 
 def tags_screen(uid,kind,group_index=-1):
+    if kind not in ('interests','skills'):return profile_screen(uid)
     source=profiles.INTERESTS if kind=='interests' else profiles.SKILLS
-    groups=list(source.items())
+    groups=list(source.items());picked=profiles.draft_selection(uid,kind)
+    text=('🤔Выбери свои интересы. Всего можно отметить до 10 пунктов, поэтому выбирай только самые близкие!' if kind=='interests' else
+          '💪Выбери свои навыки. Всего можно отметить до 10 пунктов, поэтому отмечай только самые прокачанные скиллы!')
+    text+=' Сейчас у тебя выбраны: '+(', '.join(picked) or ('нет выбранных интересов' if kind=='interests' else 'нет выбранных навыков'))
+    if len(picked)>=10:text+='\n'+('Тебя интересует очень многое! Жаль, экран слишком маленький, и ещё больше выбрать не получится' if kind=='interests' else 'Ты столько всего знаешь! Больше уже на экран не поместится!')
     if group_index<0:
-        return ui('Выбери категорию. Всего можно отметить до 10 пунктов:',
-                  [[b(n,f'tags:{kind}:{i}') ] for i,(n,_) in enumerate(groups)]+
-                  [[b('✅ Готово',f'tags:done:{kind}')]])
-    if group_index>=len(groups):return tags_screen(uid,kind)
-    group,opts=groups[group_index];picked=profiles.selection(uid,kind)
-    return ui(group+'\nОтметь нужные варианты:',[
-        [b(('✓ ' if v in picked else '')+v,f'tags:toggle:{kind}:{group_index}:{i}')]
-        for i,v in enumerate(opts)]+[[b('◀ К категориям',f'tags:{kind}'),b('✅ Готово',f'tags:done:{kind}')]])
+        rows=[[b(n,f'tags:{kind}:{i}')] for i,(n,_) in enumerate(groups)]
+        done=f'tags:done:{kind}'
+    elif group_index<len(groups):
+        group,opts=groups[group_index];text+='\n'+group
+        rows=[[b(('✓ ' if v in picked else '')+v,f'tags:toggle:{kind}:{group_index}:{i}')] for i,v in enumerate(opts)]
+        done=f'tags:{kind}'
+    else:return tags_screen(uid,kind)
+    return ui(text,rows+([[b('✅ Готово',done)]] if picked else [])+[[b('✕ Отмена','profile')]])
+
+
+def wizard_prompt(uid,field):
+    profiles.set_stage(uid,'wizard_'+field)
+    if field in ('interests','skills'):
+        profiles.begin_tags(uid,field)
+        return tags_screen(uid,field)
+    return ui('📍В каком городе ты живешь?' if field=='city' else '🎂 Сколько тебе лет? Напиши число.',[[b('✕ Отмена','profile')]])
 
 
 def event_card(index,uid,mode='card'):
@@ -332,15 +352,7 @@ def event_card(index,uid,mode='card'):
     index=max(0,min(index,len(found)-1));e=found[index]
     if e['status']=='hidden':
         return ui('Это мероприятие больше недоступно. Давай посмотрим другие!',[[b('🎯 К мероприятиям','card:0')],home_btn()])
-    date=e['date'] or 'Не указана'
-    try:
-        if date[:10].count('-')==2:
-            parsed=datetime.strptime(date[:10],'%Y-%m-%d')
-            months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
-            date=f'{parsed.day} {months[parsed.month-1]} {parsed.year}'+date[10:]
-    except ValueError:pass
-    tags=', '.join(json.loads(e['tags'] or '[]'))
-    text=f'🎯 {e["title"]}\n📅 Когда: {date}\n📍 Где: {e["place"] or "Не указано"}\n🌐 Формат: {e["format"] or "Не указан"}\n\n{e["description"] or ""}\n\n{tags}'
+    text=event_text(e)
     nav=[]
     if index: nav.append(b('◀ Назад',f'{mode}:{index-1}'))
     if index<len(found)-1:nav.append(b('Далее ▶',f'{mode}:{index+1}'))
@@ -351,6 +363,7 @@ def event_card(index,uid,mode='card'):
 
 
 def people_screen(uid,role='student',index=0):
+    role='student'
     current=me(uid)
     if current and current['role']=='teacher' and not te.is_teacher(uid):
         return teacher_screen(uid)
@@ -361,7 +374,7 @@ def people_screen(uid,role='student',index=0):
             [profile_button(uid)],home_btn()])
     found=people.list_people(uid,role)
     if not found:return ui('👥 Пока никого не нашли. Попробуй изменить возраст, интересы или навыки.',[
-        [b('⚙ Фильтры','p:filters'),b('👩‍🏫 Педагоги' if role=='student' else '🎒 Школьники',f'p:{"teacher" if role=="student" else "student"}:0')],home_btn()])
+        [b('⚙ Фильтры','p:filters')],home_btn()])
     index=max(0,min(index,len(found)-1));p=found[index]
     nav=[]
     if index:nav.append(b('◀ Назад',f'p:{role}:{index-1}'))
@@ -369,7 +382,7 @@ def people_screen(uid,role='student',index=0):
     return ui(people.card_text(p,index,len(found))+'\n\n'+('Хотите связаться?' if me(uid) and me(uid)['role']=='teacher' else 'Хочешь отправить заявку в друзья?'),[
         [b('📩 Связаться',f'dm:write:{p["user_id"]}') if me(uid) and me(uid)['role']=='teacher' else b('📩 Отправить заявку',f'req:send:{p["user_id"]}:{role}:{index}')],
         [b('⚙ Фильтры','p:filters'),b('🏠 В меню','home')],
-        [b('🎒 Школьники','p:student:0'),b('👩‍🏫 Педагоги','p:teacher:0')],nav])
+        nav])
 
 
 AGE_RANGES=[('До 11 лет','3-11'),('12–15 лет','12-15'),('16–18 лет','16-18'),('19–25 лет','19-25'),('26+ лет','26-100')]
@@ -378,10 +391,10 @@ AGE_RANGES=[('До 11 лет','3-11'),('12–15 лет','12-15'),('16–18 ле�
 def people_filters(uid):
     def preview(field):
         vals=people.get_values(uid,field)
-        return ', '.join(vals[:2])+(' +'+str(len(vals)-2) if len(vals)>2 else '') if vals else 'Любые'
+        return ', '.join(vals) if vals else 'Любые'
     return ui('⚙ Фильтры людей\n\n🎂 Возраст: '+preview('ages')+
               '\n💡 Интересы: '+preview('interests')+'\n🛠 Навыки: '+preview('skills')+
-              '\n\nГород на этапе MVP не ограничивает поиск.',[
+              '',[
         [b('🎂 Возраст','pf:begin:ages'),b('💡 Интересы','pf:begin:interests')],
         [b('🛠 Навыки','pf:begin:skills')],
         [b('🔎 Смотреть анкеты','p:student:0')],
@@ -399,14 +412,14 @@ def person_filter_screen(uid,field,group=-1):
     source=INTERESTS if field=='interests' else SKILLS
     groups=list(source.items())
     if group<0:
-        return ui('Выбери категорию '+('интересов' if field=='interests' else 'навыков')+':',[
+        return ui('Выбери категорию '+('интересов' if field=='interests' else 'навыков')+'. Выбрано: '+', '.join(people.get_values(uid,field,True)),[
             [b(n,f'pf:group:{field}:{i}')] for i,(n,_) in enumerate(groups)]+
-            [[b('✅ Готово','pf:save:'+field),b('◀ Назад (без сохранения)','pf:cancel')]])
+            ([[b('✅ Готово','pf:save:'+field)]] if people.get_values(uid,field,True) else [])+[[b('◀ Назад (без сохранения)','pf:cancel')]])
     if group>=len(groups):return person_filter_screen(uid,field)
     title,opts=groups[group];selected=people.get_values(uid,field,True)
-    return ui(title+'\nМожно выбрать до 10 пунктов.',[
+    return ui(title+'\nВыбрано: '+', '.join(selected)+'\nМожно выбрать до 10 пунктов.',[
         [b(('✓ ' if value in selected else '')+value,f'pf:toggle:{field}:{group}:{i}')]
-        for i,value in enumerate(opts)]+[[b('◀ К категориям',f'pf:group:{field}:-1'),b('✅ Готово','pf:save:'+field)],
+        for i,value in enumerate(opts)]+[[b('◀ К категориям',f'pf:group:{field}:-1'),b('✅ Готово',f'pf:group:{field}:-1')],
                                         [b('✕ Отменить изменения','pf:cancel')]])
 
 
@@ -475,7 +488,7 @@ def teacher_screen(uid):
     status=p['teacher_status']
     if status=='approved':
         return ui(f'✅ Статус педагога подтверждён.\nФИО: {p["name"]}\nМесто работы: {p["teacher_workplace"]}\nДолжность: {p["teacher_position"]}', [home_btn()])
-    if status=='pending':return ui('⏳ Заявка получена! Модератор проверит документ.',[[b('🎯 Мероприятия','card:0')],home_btn()])
+    if status=='pending':return ui('⏳ Ваша заявка на подтверждение статуса педагога получена. Модератор рассмотрит её в ближайшее время и после этого вам станет доступен весь функционал платформы',[[b('🎯 Мероприятия','card:0')],home_btn()])
     draft=te.verification_draft(uid)
     rows=[[b('✏️ ФИО','te:verify:full_name')],
           [b('✏️ Место работы','te:verify:workplace')],
@@ -490,7 +503,7 @@ def teacher_screen(uid):
           f'ФИО: {draft["full_name"] or "Не заполнено"}\n'
           f'Место работы: {draft["workplace"] or "Не заполнено"}\n'
           f'Должность: {draft["position"] or "Не заполнено"}\n\n'
-          'Заполни данные, затем отправь ссылку на документ. Заявку увидят модераторы.')
+          'Заполните данные, затем отправьте ссылку на документ. Заявку увидят модераторы.')
     if status=='rejected':text='✕ Предыдущая заявка отклонена. Данные можно исправить и отправить заново.\n\n'+text
     return ui(text,rows)
 
@@ -508,8 +521,7 @@ def event_data(uid):
 
 
 def event_card_text(uid):
-    data=event_data(uid)
-    return '\n'.join(f'{EVENT_LABELS[field]}: {", ".join(data[field]) if isinstance(data.get(field), list) else data.get(field) or "—"}' for field in EVENT_STEPS)
+    return event_text(event_data(uid))
 
 
 def event_topic_screen(uid, edit=False, group=None):
@@ -532,7 +544,7 @@ def event_topic_screen(uid, edit=False, group=None):
                   f'te:topictoggle:{mode}:{group}:{i}')]
                for i, tag in enumerate(names)]
     return ui(f'{title}\nВыбрано: {", ".join(selected) or "Пока ничего"}',
-              buttons + [[b('◀️ К категориям', f'te:topicgroups:{mode}'), done]])
+              buttons + [[b('✅ Готово', f'te:topicgroups:{mode}')]])
 
 
 def event_prompt(uid,field,edit=False):
@@ -563,11 +575,7 @@ def draft_screen(uid,mode='auto'):
             [b('◀️ Назад','te:draft'),b('✅Готово','te:draft')]])
     missing=next((field for field in EVENT_STEPS if not data.get(field)), None)
     if missing and mode!='preview':
-        return ui('➕ Новое мероприятие\n\nРасскажите о событии, которое Вы хотите разместить.\n'
-                  'Пойдём по шагам — после заполнения можно будет проверить всё перед отправкой.\n\n'
-                  +te.QUESTIONS[missing],[
-                  [b('▶️ Продолжить',f'te:field:{missing}')],
-                  [b('✏️ Изменить','te:edit')],home_btn()])
+        return event_prompt(uid,missing)
     return ui('✅ Всё заполнено!\nПроверьте информацию о мероприятии.\n'
               'Если всё верно, можете отправить карточку на проверку.\n\n'+event_card_text(uid),[
                   [b('✅ Отправить на проверку','te:send')],
@@ -578,11 +586,11 @@ def draft_screen(uid,mode='auto'):
 def mod_screen(uid,which='home',page=0):
     if not te.is_moderator(uid):return ui('⛔ Нет доступа к модерации.',[home_btn()])
     if which=='home':return ui('🛡 Меню модератора',[
-        [b('👩‍🏫 Проверка педагогов','mod:teachers'),b('📅 Проверка мероприятий','mod:events')],
+        [b('👩‍🏫 Проверка педагогов','mod:teachers')],[b('📅 Проверка мероприятий','mod:events')],
         [b('🚩 Жалобы','mod:reports'),b('🚫 Заблокированные','mod:blocks')],
         [b('🔄 Заявки на смену роли','mod:roles')],
         [b('📅 Опубликованные','mod:published')],
-        [b('🚪 Выйти из модерации','mod:logout')],home_btn()])
+        [b('🚪 Выйти из модерации','mod:logout')]])
     if which=='roles':
         found=rr.pending()
         if not found:return ui('✅ Заявок на смену роли пока нет.',[[b('◀ Назад','mod:home')]])
@@ -607,7 +615,7 @@ def mod_screen(uid,which='home',page=0):
         found=te.pending_events()
         if not found:return ui('Больше мероприятий на проверке нет.',[[b('◀ Назад','mod:home')]])
         r=found[0]
-        return ui(f'📅 Заявка №{r["id"]}\n{r["draft"]}',[
+        return ui(f'📅 Заявка №{r["id"]}\n'+event_text(json.loads(r['draft'])),[
             [b('✅ Опубликовать',f'mod:eventok:{r["id"]}'),b('✕ Отклонить',f'mod:eventreject:{r["id"]}')],
             [b('◀ Назад','mod:home')]])
     if which=='published':
@@ -766,9 +774,11 @@ async def callback(event):
             logic_started = perf_counter()
             try:
                 text, attachments = await dispatch(uid, parts)
+                remember_sender(event.callback.user)
             finally:
                 LOG.info('callback_logic elapsed_ms=%.1f', (perf_counter() - logic_started) * 1000)
-            await show_screen(uid, text, attachments, callback_message=event.message)
+            await show_screen(uid, text, attachments, callback_message=event.message,
+                              force_new=(stage != profiles.stage(uid) and (stage.startswith('wizard_') or profiles.stage(uid).startswith('wizard_'))))
     except Exception as error:
         LOG.warning('callback_failed type=%s', type(error).__name__)
         await notify(uid, 'Не удалось обновить экран. Открой /start для продолжения.')
@@ -817,14 +827,17 @@ async def dispatch(uid,parts):
             profiles.set_stage(uid,'')
             return profile_screen(uid)
         action=parts[1]
-        if action=='edit':return edit_menu()
+        if action=='edit':
+            return edit_menu() if profiles.complete(uid) else wizard_prompt(uid,'city')
         if action=='field':
             field=parts[2]
             if field in ('city','age'):
                 profiles.set_stage(uid,field)
-                return ui('📍 В каком городе ты живёшь?' if field=='city' else '🎂 Сколько тебе лет? Напиши число.',[
+                return ui('📍В каком городе ты живешь?' if field=='city' else '🎂 Сколько тебе лет? Напиши число.',[
                     [b('◀ Отмена','profile')]])
-            if field in ('interests','skills'):return tags_screen(uid,field)
+            if field in ('interests','skills'):
+                profiles.begin_tags(uid,field)
+                return tags_screen(uid,field)
         if action=='publishconfirm':
             if not profiles.complete(uid):return ui('Сначала заполни город, возраст, интересы и навыки.',[
                 [b('✏️ Заполнить анкету','profile:edit')],home_btn()])
@@ -844,12 +857,15 @@ async def dispatch(uid,parts):
             people.delete(uid);return ui('✅ Анкета удалена.',[[b('✏️ Заполнить анкету','profile:edit')],home_btn()])
     if act=='tags':
         if parts[1]=='done':
+            kind=parts[2]
+            if kind not in ('interests','skills') or not profiles.apply_tags(uid,kind):return tags_screen(uid,kind)
+            if profiles.stage(uid)=='wizard_interests':return wizard_prompt(uid,'skills')
             profiles.set_stage(uid,'')
             if profiles.complete(uid):profiles.set_field(uid,'waiting',0)
             return profile_screen(uid)
         if parts[1]=='toggle':
             kind=parts[2];idx=int(parts[3]);choice=int(parts[4]);groups=list((profiles.INTERESTS if kind=='interests' else profiles.SKILLS).values())
-            if idx<len(groups) and choice<len(groups[idx]):profiles.toggle(uid,kind,groups[idx][choice])
+            if 0<=idx<len(groups) and 0<=choice<len(groups[idx]):profiles.toggle_draft(uid,kind,groups[idx][choice])
             return tags_screen(uid,kind,idx)
         return tags_screen(uid,parts[1],int(parts[2]) if len(parts)>2 else -1)
     if act in ('card','favorite','result'):
@@ -867,14 +883,9 @@ async def dispatch(uid,parts):
         if sub in ('student','teacher'):return people_screen(uid,sub,int(parts[2]))
         if sub=='filters':return people_filters(uid)
         if sub=='city':
-            cities=sorted({x['city'] for x in people.list_people(uid,'student')+people.list_people(uid,'teacher') if x['city']})
+            cities=sorted({x['city'] for x in people.list_people(uid,'student') if x['city']})
             value='' if parts[2]=='any' else (cities[int(parts[2])] if int(parts[2])<len(cities) else '')
             people.update_filter(uid,'city',value);return people_filters(uid)
-        if sub=='interests':return people_interest_screen()
-        if sub=='interest':
-            vals=[v for cat in profiles.INTERESTS.values() for v in cat]
-            if int(parts[2])<len(vals):people.update_filter(uid,'interest',vals[int(parts[2])])
-            return people_filters(uid)
         if sub=='reset':
             people.reset_filter(uid);return people_filters(uid)
     if act=='pf':
@@ -882,7 +893,9 @@ async def dispatch(uid,parts):
         if sub=='reset':people.reset_filter(uid);return people_filters(uid)
         if sub=='cancel':return people_filters(uid)
         if sub=='begin':people.begin_filter(uid,parts[2]);return person_filter_screen(uid,parts[2])
-        if sub=='save':people.commit_filter(uid,parts[2]);return people_filters(uid)
+        if sub=='save':
+            if parts[2]!='ages' and not people.get_values(uid,parts[2],True):return person_filter_screen(uid,parts[2])
+            people.commit_filter(uid,parts[2]);return people_filters(uid)
         if sub=='group':return person_filter_screen(uid,parts[2],int(parts[3]))
         if sub=='toggle':
             field=parts[2]
@@ -906,8 +919,8 @@ async def dispatch(uid,parts):
             profiles.set_stage(uid,'dm_'+str(peer))
             if sub=='reply':
                 prior=dm.last(peer,uid)
-                prompt='✏ Напиши ответ для '+name(peer)+'\n'+(prior['text'][:800] if prior else '')
-            else:prompt='💬 Отправь сообщение для '+name(peer)+'.\nБот передаст его одним сообщением.'
+                prompt='✏ Напиши ответ для '+contact_name(peer)+'\n\n'+(prior['text'][:800] if prior else '')
+            else:prompt='💬 Отправь сообщение для '+contact_name(peer)+'.\nБот передаст его одним сообщением.'
             return ui(prompt,[[b('✕ Отмена','dm:cancel')]])
         if sub=='cancel':profiles.set_stage(uid,'');return menu(uid)
         if sub=='report':
@@ -935,7 +948,7 @@ async def dispatch(uid,parts):
         if sub in ('accept','reject'):
             target=int(parts[2]);msg=social.decision(uid,target,sub=='accept')
             if msg.startswith('🤝'):queue_notify(target,f'🎉 {name(uid)} принял твою заявку! Теперь вы в друзьях.',keyboard([[b('🤝 Друзья','friend:0')]]))
-            elif msg.startswith('✕'):queue_notify(target,'Твою заявку не приняли.')
+            elif msg.startswith('✕'):queue_notify(target,f'{name(uid)} не принял твою заявку в друзья',keyboard([home_btn(),[b('👥 Найти людей','p:student:0')]]))
             return ui(msg,[[b('📩 К заявкам','req:in:0'),b('🤝 Друзья','friend:0')],home_btn()])
         if sub=='cancel':
             ok=social.cancel(uid,int(parts[2]));return ui('✅ Заявка отменена.' if ok else 'Заявка уже обработана.',[[b('📤 Мои заявки','req:out:0')],home_btn()])
@@ -988,13 +1001,13 @@ async def dispatch(uid,parts):
                 draft=te.verification_draft(uid)
                 if not all(draft[f] for f in te.TEACHER_FIELDS):return teacher_screen(uid)
                 profiles.set_stage(uid,'teacher_doc')
-                return ui('📄 Отправь ссылку на документ (http:// или https://). Его увидят только модераторы.',
+                return ui('📄 Отправьте ссылку на документ (http:// или https://). Его увидят только модераторы.',
                           [[b('◀ Назад','te:check')]])
             if field not in te.TEACHER_FIELDS:return teacher_screen(uid)
             profiles.set_stage(uid,'teacher_'+field)
-            prompts={'full_name':'✏️ Напиши ФИО полностью.',
-                     'workplace':'✏️ Укажи место работы (название образовательной организации).',
-                     'position':'✏️ Напиши свою должность.'}
+            prompts={'full_name':'✏️ Укажите ФИО полностью.',
+                     'workplace':'✏️ Укажите место работы (название образовательной организации).',
+                     'position':'✏️ Укажите свою должность.'}
             return ui(prompts[field],[[b('◀ Назад','te:check')]])
         if sub=='new':
             if not te.is_teacher(uid):return teacher_screen(uid)
@@ -1061,7 +1074,7 @@ async def dispatch(uid,parts):
             id=int(parts[2]);found=[r for r in te.my_events(uid) if r['id']==id]
             if not found:return ui('Не найдено.',[[b('◀ Назад','te:mine')]])
             r=found[0]
-            return ui(f'🗂 Событие №{id}\nСтатус: {te.status_label(r)}\n{r["draft"]}\nЗамечания: {r["comment"]}',[
+            return ui(f'🗂 Событие №{id}\nСтатус: {te.status_label(r)}\n'+event_text(json.loads(r['draft']))+'\nЗамечания: '+escape(r['comment'][:150]),[
                 [b('✏ Исправить',f'te:redo:{id}')] if r['status'] in ('rejected','published','draft') else [],
                 [b('◀ Назад','te:mine')]])
         if sub=='redo':
@@ -1106,13 +1119,13 @@ async def dispatch(uid,parts):
             return ui('✏ Отправь замечания к мероприятию одним сообщением.',[[b('◀ Назад','mod:events')]])
         if sub=='teacherok':
             target=te.decide_teacher(uid,int(parts[2]),True)
-            if target:queue_notify(target,'✅ Статус педагога подтверждён!')
+            if target:queue_notify(target,'✅ Статус педагога подтверждён!',keyboard([home_btn()]))
             return mod_screen(uid,'teachers')
         if sub=='eventok':
             target=te.decide_event(uid,int(parts[2]),True)
             if target:
                 flt.invalidate_events()
-                queue_notify(target,'✅ Заявка на мероприятие одобрена. Видимость мероприятия сохранена.',keyboard([[b('🗂 Мои мероприятия','te:mine')],home_btn()]))
+                queue_notify(target,te.publication_notice(int(parts[2])),keyboard([[b('📅 Мероприятия','card:0')],[b('🗂 Мои мероприятия','te:mine')]]))
             else:return ui('Заявка уже обработана либо обнаружен конфликт ссылки или владельца. Проверьте заявку.',[[b('◀ Назад','mod:events')]])
             return mod_screen(uid,'events')
         if sub=='close':
@@ -1138,6 +1151,16 @@ async def text_handler(event):
     value=(event.message.body.text or '').strip()
     if not value or value.startswith('/'):return
     stage=profiles.stage(uid)
+    if stage in ('wizard_city','wizard_age'):
+        if stage=='wizard_city':
+            if not 1<=len(value)<=70:return await new_screen(uid,'Укажи название города до 70 символов.')
+            profiles.set_field(uid,'city',value)
+            text,attachments=wizard_prompt(uid,'age')
+        else:
+            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(uid,'Введи корректный возраст от 3 до 100.')
+            profiles.set_field(uid,'age',int(value))
+            text,attachments=wizard_prompt(uid,'interests')
+        return await new_screen(uid,text,attachments)
     if stage == 'role_change_reason':
         if not 5 <= len(value) <= 1000:
             return await new_screen(event.message.sender.user_id, 'Напиши причину от 5 до 1000 символов.')
@@ -1181,7 +1204,7 @@ async def text_handler(event):
         ok,msg=dm.send(uid,peer,value)
         if ok:
             profiles.set_stage(uid,'')
-            queue_notify(peer,('📩 Новое сообщение от педагога ' if me(uid)['role']=='teacher' else '💬 Новое сообщение от ')+name(uid)+'!\n\n'+value[:3500],
+            queue_notify(peer,('📩 Новое сообщение от педагога ' if me(uid)['role']=='teacher' else '💬 Новое сообщение от ')+contact_name(uid)+'!\n\n'+value[:3500],
                 keyboard([[b('✏ Ответить',f'dm:reply:{uid}'),b('🚩 Пожаловаться',f'dm:report:{uid}')]]))
         return await new_screen(event.message.sender.user_id, text=msg,attachments=keyboard([[b('🤝 Друзья','friend:0')],home_btn()]))
     if stage == 'moderator_code':
@@ -1209,23 +1232,24 @@ async def text_handler(event):
             if target:await notify(target,'✕ Статус педагога не подтверждён. Причина: '+value[:1000])
         elif stage.startswith('modevent_'):
             if not te.is_moderator(uid):return
+            proposal=te.get_proposal(int(stage.split('_')[1]))
             target=te.decide_event(uid,int(stage.split('_')[1]),False,value[:1000])
-            if target:await notify(target,'✕ Заявка на мероприятие отклонена. Ранее опубликованная версия сохранена, если она была. Замечания: '+value[:1000],keyboard([[b('🗂 Мои мероприятия','te:mine')],home_btn()]))
+            if target:await notify(target,f'❌ Ваше мероприятие {json.loads(proposal["draft"]).get("title","")} было отклонено модератором. Можете ознакомиться с комментарием:\n{value[:1000]}'+('\nРанее опубликованная версия сохранена.' if proposal['event_id'] else ''),keyboard([[b('➕ Добавить мероприятие','te:new')],home_btn()]))
         elif stage.startswith('teacher_') and stage!='teacher_doc':
             field=stage[len('teacher_'):]
             if not te.save_verification_field(uid,field,value):
-                return await new_screen(uid, 'Введи от 2 до 150 символов. ФИО указывай минимум из двух слов.')
+                return await new_screen(uid, 'Введите от 2 до 150 символов. ФИО указывайте минимум из двух слов.')
             profiles.set_stage(uid,'')
             next_fields=list(te.TEACHER_FIELDS)
             current=next_fields.index(field)
             if current+1<len(next_fields):
-                text,attachments=dispatch(uid,['te','verify',next_fields[current+1]])
+                text,attachments=await dispatch(uid,['te','verify',next_fields[current+1]])
             else:
                 text,attachments=teacher_screen(uid)
             return await new_screen(uid,text='✅ Сохранено!\n\n'+text,attachments=attachments)
         elif stage=='teacher_doc':
             if not te.check_submit(uid,value):
-                return await new_screen(uid, 'Проверь, что ФИО, место работы и должность заполнены, а ссылка начинается с http:// или https://.')
+                return await new_screen(uid, 'Проверьте, что ФИО, место работы и должность заполнены, а ссылка начинается с http:// или https://.')
         elif stage.startswith('event_') or stage.startswith('eventedit_'):
             edit=stage.startswith('eventedit_')
             field=stage[len('eventedit_'):] if edit else stage[len('event_'):]
@@ -1235,6 +1259,9 @@ async def text_handler(event):
             if field=='url' and not te.valid_url(value):
                 return await new_screen(uid, 'Нужна ссылка, начинающаяся с http:// или https://.')
             if len(value)>2000:return await new_screen(uid, 'Максимум 2000 символов.')
+            if field=='date':
+                try:value=parse_teacher_date(value)
+                except ValueError as error:return await new_screen(uid,str(error),event_prompt(uid,field,edit)[1])
             te.set_draft(uid,field,value)
         else:return
         profiles.set_stage(uid,'')

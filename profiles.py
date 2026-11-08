@@ -86,3 +86,37 @@ def delete(uid):
 # Старый интерфейс API для совместимости.
 def waiting(uid): return stage(uid) in ('city','age','bio')
 def save(uid, bio): set_field(uid,'bio',bio); set_stage(uid,'')
+
+
+def ui_data(uid):
+    with connect() as db:
+        row=db.execute('SELECT data FROM user_workflows WHERE user_id=?',(uid,)).fetchone()
+    return json.loads(row['data']) if row else {}
+
+
+def save_ui_data(uid,data):
+    with connect() as db:
+        db.execute('INSERT INTO user_workflows(user_id,data) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data',
+                   (uid,json.dumps(data,ensure_ascii=False)))
+
+
+def begin_tags(uid,kind):
+    data=ui_data(uid);data[kind]=selection(uid,kind);save_ui_data(uid,data)
+
+
+def draft_selection(uid,kind):
+    return ui_data(uid).get(kind,selection(uid,kind))
+
+
+def toggle_draft(uid,kind,item):
+    picked=draft_selection(uid,kind)
+    if item in picked:picked.remove(item)
+    elif len(picked)<10:picked.append(item)
+    data=ui_data(uid);data[kind]=picked;save_ui_data(uid,data)
+
+
+def apply_tags(uid,kind):
+    picked=draft_selection(uid,kind)
+    if not 1<=len(picked)<=10:return False
+    set_field(uid,kind,picked)
+    return True

@@ -13,7 +13,7 @@ FIELDS=['title','description','date','place','format','tags','url']
 QUESTIONS={
  'title':'Как называется мероприятие?',
  'description':'Коротко расскажите, что будет происходить.',
- 'date':'Когда пройдёт мероприятие? Укажите дату в формате ГГГГ-ММ-ДД и время при необходимости.',
+ 'date':'Когда пройдёт мероприятие? Укажите ДД.ММ.ГГ, ДД.ММ.ГГ ЧЧ.ММ или ДД.ММ.ГГ - ДД.ММ.ГГ.',
  'place':'Где пройдёт главное мероприятие?',
  'format':'Это онлайн- или офлайн-мероприятие?',
  'tags':'Какие темы подходят мероприятию? Выберите темы из списка.',
@@ -284,3 +284,14 @@ def resume_rejected(uid, request_id):
         if db.execute("SELECT 1 FROM proposed_events WHERE teacher_id=? AND status='draft'",(uid,)).fetchone():return False
         result=db.execute("UPDATE proposed_events SET status='draft' WHERE teacher_id=? AND id=? AND status='rejected' AND event_id IS NULL",(uid,request_id))
         return bool(result.rowcount)
+
+
+def get_proposal(request_id):
+    with connect() as db:return db.execute('SELECT * FROM proposed_events WHERE id=?',(request_id,)).fetchone()
+
+
+def publication_notice(request_id):
+    row=get_proposal(request_id)
+    with connect() as db:event=db.execute('SELECT * FROM events WHERE id=?',(row['event_id'],)).fetchone()
+    if event['status']=='hidden':return f'Изменения мероприятия {event["title"]} одобрены. Мероприятие остаётся скрытым.'
+    return f'Ваше мероприятие {event["title"]} опубликовано в каталоге'

@@ -150,7 +150,7 @@ def screen(uid, view='home', param=None):
         return options('📆 Выбери день',[(str(d),str(d),f'day:{y}-{m:02}-{d:02}') for d in range(1,calendar.monthrange(y,m)[1]+1)],[],f'month:{y}:{m}')
 
 @lru_cache(maxsize=4096)
-def dates(value):
+def _dates(value):
     if not value: return None,None
     found=re.findall(r'20\d\d-\d\d-\d\d',value)
     if found: return date.fromisoformat(found[0]),date.fromisoformat(found[-1])
@@ -159,6 +159,16 @@ def dates(value):
         d,mo,y=map(int,m.groups())
         return date(y,mo,d),None
     return None,None
+
+def dates(value):
+    try:return _dates(value)
+    except (ValueError,TypeError):return None,None
+
+
+def concrete_date(value):
+    start,end=dates(value)
+    return start is not None and start==end and not value.lower().startswith('с ')
+
 
 def window(period):
     d=today()
@@ -201,7 +211,7 @@ def matches(e,s):
     if s['period']=='anytime': return not end or indefinite
     w=window(s['period'])
     if not w: return True
-    if not start: return False
+    if not start: return True
     return start<=w[1] and (end>=w[0] if end else indefinite or start>=w[0])
 
 # Короткий кэш общего списка (0.8 c): соседние карточки не читают всю БД.
@@ -242,6 +252,7 @@ def results(uid=None):
         # Сначала мероприятия с максимальным числом совпавших тегов.
         # При одинаковом числе совпадений — ближайшие по дате.
         found.sort(key=lambda e: (
+            not concrete_date(e['date'] or '') if s['period'] else False,
             -tag_score(e, selected_tags),
             dates(e['date'] or '')[0] is None,
             dates(e['date'] or '')[0] or date.max,

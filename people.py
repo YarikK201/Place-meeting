@@ -112,18 +112,16 @@ def list_people(uid,role=None):
     elif not s or not s['visible'] or not profiles.complete(uid):
         return []
     f=search_filter(uid)
-    role=role or f['role']
+    role='student'
     with connect() as db:
         rows=db.execute('''SELECT p.* FROM profiles p JOIN people_settings s ON s.user_id=p.user_id
            WHERE s.visible=1 AND p.waiting=0 AND p.user_id!=? AND p.role=?
              AND NOT EXISTS(SELECT 1 FROM global_blocks g WHERE g.user_id=p.user_id)
              AND NOT EXISTS(SELECT 1 FROM interactions_blocked b WHERE
-               (b.blocker=p.user_id AND b.blocked=?) OR (b.blocker=? AND b.blocked=p.user_id))
-             ORDER BY p.user_id''',(uid,role,uid,uid)).fetchall()
+               ((b.blocker=p.user_id AND b.blocked=?) OR (b.blocker=? AND b.blocked=p.user_id)) AND (b.expires_at IS NULL OR b.expires_at>?))
+             ORDER BY p.user_id''',(uid,role,uid,uid,social.UTC().isoformat())).fetchall()
     ages=get_values(uid,'ages');ints=get_values(uid,'interests');skills=get_values(uid,'skills')
-    if role=='teacher':rows=[p for p in rows if p['teacher_status']=='approved']
     def matches(p):
-        if p['role']=='teacher':return True  # У педагогов нет ученических полей возраста и интересов.
         if ages and not (p['age'] is not None and any(lo<=p['age']<=hi for lo,hi in (map(int,a.split('-')) for a in ages))):return False
         pi=set(json.loads(p['interests'] or '[]'));ps=set(json.loads(p['skills'] or '[]'))
         return (not ints or bool(pi.intersection(ints))) and (not skills or bool(ps.intersection(skills)))
@@ -137,7 +135,7 @@ def card_text(p,index=None,total=None):
     title=p['name'] or 'Участник'
     hdr=f'👤 {title}' if index is None else f'👤 {title} — {index+1}/{total}'
     if p['role']=='teacher':
-        return (f'{hdr}\n🏫 Место работы: {p["teacher_workplace"] or "Не указано"}\n'
+        return (f'👩‍🏫 Педагог\n{hdr}\n🏫 Место работы: {p["teacher_workplace"] or "Не указано"}\n'
                 f'💼 Должность: {p["teacher_position"] or "Не указана"}')
     def tags(k):return ', '.join(json.loads(p[k] or '[]')) or 'Не указано'
     return (f'{hdr}\n📍 Город: {p["city"] or "Не указан"}\n'
