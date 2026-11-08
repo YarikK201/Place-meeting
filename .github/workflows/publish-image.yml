@@ -3,7 +3,7 @@ name: Publish Docker image
 on:
   workflow_dispatch:
   push:
-    branches: [dev]
+    branches: [dev, main]
 
 permissions:
   contents: read
@@ -14,47 +14,81 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Build and run technical checks without MAX access
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
         run: |
           docker build -t place-meeting-ci .
-          docker run --rm --network none --entrypoint python place-meeting-ci -m pip check
-          docker run --rm -i --network none --entrypoint python place-meeting-ci - <<'PY'
+
+      - name: Check Python dependencies
+        run: |
+          docker run --rm \
+            --network none \
+            --entrypoint python \
+            place-meeting-ci \
+            -m pip check
+
+      - name: Check Python syntax and imports
+        run: |
+          docker run --rm -i \
+            --network none \
+            --entrypoint python \
+            place-meeting-ci - <<'PY'
           import importlib
           import os
           from pathlib import Path
           import tempfile
 
           sources = sorted(Path('/app').glob('*.py'))
+
           for source in sources:
               compile(source.read_bytes(), str(source), 'exec')
+
           with tempfile.TemporaryDirectory() as directory:
               os.environ['MAX_BOT_TOKEN'] = 'offline-check'
               os.environ['EVENTS_DB'] = directory + '/events.db'
+
               for source in sources:
                   importlib.import_module(source.stem)
-          print('Python syntax and module imports OK; user scenarios not checked')
+
+          print('Python syntax and module imports OK')
           PY
-          MAX_BOT_TOKEN=offline-test MODERATOR_ACCESS_CODE=offline-test-code docker compose config --quiet
-      - name: Log in to GHCR
+
+      - name: Check Docker Compose configuration
+        run: |
+          MAX_BOT_TOKEN=offline-test \
+          MODERATOR_ACCESS_CODE=offline-test-code \
+          docker compose config --quiet
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish image after technical checks
+
+      - name: Publish Docker image
         env:
           REPOSITORY: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
           image="ghcr.io/${REPOSITORY,,}"
-          docker tag place-meeting-ci "$image:dev"
+
           docker tag place-meeting-ci "$image:sha-$COMMIT_SHA"
           docker push "$image:sha-$COMMIT_SHA"
-          docker push "$image:dev"
+
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            docker tag place-meeting-ci "$image:latest"
+            docker push "$image:latest"
+          else
+            docker tag place-meeting-ci "$image:dev"
+            docker push "$image:dev"
+          fi
