@@ -1,1 +1,4 @@
+-c constraints.txt
 maxapi==1.2.3
+# ZoneInfo на Windows (в Linux обычно используется системная база зон).
+tzdata==2026.6

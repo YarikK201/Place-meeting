@@ -19,3 +19,14 @@ README*.md
 venv/
 .idea/
 .vscode/
+.github/
+attachments/
+*.cer
+*.pem
+*.key
+*.sqlite
+*.sqlite-*
+*.tar
+*.tar.gz
+README.txt
+AGENTS.md

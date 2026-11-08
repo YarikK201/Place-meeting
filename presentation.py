@@ -22,7 +22,7 @@ def escape(value):
 def russian_date(value):
     raw=str(value or 'Не указана')
     try:
-        parts=re.split(r'\s+-\s+',raw)
+        parts=re.split(r'\s+[-—–]\s+',raw)
         first=datetime.fromisoformat(parts[0])
         a=first.date()
         if len(parts)==2:

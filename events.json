@@ -1,21 +1,7 @@
 [
   {
-    "title": "Программа «Открытый музей»",
-    "description": "Программа «Открытый музей» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/tomskaya-pisanica/otkrytyy-muzey-programma/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии",
-      "Выставки"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Музей-заповедник «Томская Писаница»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Новогоднее испанское шоу мыльных пузырей: Клинк!",
-    "description": "Новогоднее испанское шоу мыльных пузырей: Клинк! — мероприятие в Кузбассе.",
+    "description": "Праздничное шоу мыльных пузырей для детей и родителей. В центре программы — необычные формы, переливающиеся пузыри и зрелищные визуальные эффекты. Подробности об участии и продолжительности — на странице организатора.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/kemerovskiy-dvorec-molodezhi/novogodnee-ispanskoe-shou-mylnykh-puzyrey-klink/",
     "tags": [
       "От 3-6 лет",
@@ -30,7 +16,7 @@
   },
   {
     "title": "Собака на сене",
-    "description": "Собака на сене — мероприятие в Кузбассе.",
+    "description": "Музыкальная комедия по пьесе Лопе де Веги. Диана, графиня де Бельфлор, влюбляется в своего секретаря Теодоро, но сословные условности и ревность осложняют отношения. Зрителей ждут интриги и остроумные диалоги.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/sobaka-na-sene-2/",
     "tags": [
       "Спектакли",
@@ -42,33 +28,8 @@
     "status": null
   },
   {
-    "title": "Осенняя кадриль",
-    "description": "Осенняя кадриль — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/osennyaya-kadril-1/",
-    "tags": [
-      "Спектакли",
-      "Драмы"
-    ],
-    "date": "2026-10-31 17:00:00",
-    "place": "ГАУК «Театр драмы Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Выставка современного дизайна «Кто? Что?»",
-    "description": "Выставка современного дизайна «Кто? Что?» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/kuzbasskiy-centr-iskusstv/vystavka-sovremennogo-dizayna-kto-chto/",
-    "tags": [
-      "Выставки"
-    ],
-    "date": "2026-10-25 11:00:00",
-    "place": "Кузбасский центр искусств",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Труффальдино из Бергамо",
-    "description": "Труффальдино из Бергамо — мероприятие в Кузбассе.",
+    "description": "Комедия положений по мотивам пьесы Карло Гольдони. Находчивый слуга Труффальдино пытается служить сразу двум хозяевам, не раскрывая своей хитрости. Ошибки, переодевания и путаница приводят к неожиданным встречам.",
     "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/truffaldino-iz-bergamo-2/",
     "tags": [
       "Спектакли",
@@ -81,7 +42,7 @@
   },
   {
     "title": "В объятиях дождя",
-    "description": "В объятиях дождя — мероприятие в Кузбассе.",
+    "description": "Танцевальное представление, в котором вода и свет становятся частью сценического оформления. Хореографические номера создают атмосферу дождя и движения; подробная программа и возрастные ограничения указаны у организатора.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-zheleznodorozhnikov-kaliningrad/v-obyatiyakh-dozhdya-tancevalnoe-shou-s-dozhdem/",
     "tags": [
       "Концерты",
@@ -94,21 +55,8 @@
     "status": null
   },
   {
-    "title": "Служебный роман",
-    "description": "Служебный роман — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/sluzhebnyy-roman-1/",
-    "tags": [
-      "Спектакли",
-      "Комедии"
-    ],
-    "date": "2026-10-25 17:00:00",
-    "place": "Музыкальный театр Кузбасса им. Боброва",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Бременские музыканты",
-    "description": "Бременские музыканты — мероприятие в Кузбассе.",
+    "description": "Музыкальная сказка о Трубадуре и его друзьях — Осле, Псе, Коте и Петухе. Герои путешествуют, выступают и помогают Трубадуру добиться любви Принцессы. Представление основано на знакомом сказочном сюжете.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/bremenskie-muzykanty-1/",
     "tags": [
       "Спектакли",
@@ -123,7 +71,7 @@
   },
   {
     "title": "Щелкунчик",
-    "description": "Щелкунчик — мероприятие в Кузбассе.",
+    "description": "Балетная история по сказке Э. Т. А. Гофмана о Мари, Щелкунчике и Мышином короле. В волшебном сне игрушки оживают, а герои отправляются в сказочное путешествие. Музыкальная основа — произведение П. И. Чайковского.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-neftyanik/schelkunchik-5/",
     "tags": [
       "Классика",
@@ -136,7 +84,7 @@
   },
   {
     "title": "Электросветовое шоу City Pipes",
-    "description": "Электросветовое шоу City Pipes — мероприятие в Кузбассе.",
+    "description": "Концертное световое шоу коллектива City Pipes. Музыка и ритм сочетаются с яркими световыми эффектами, создавая необычное сценическое представление. Точный состав программы уточняется на странице события.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/koncert-kholl-rcso/elektrosvetovoe-shou-city-pipes-1/",
     "tags": [
       "Концерты",
@@ -148,21 +96,8 @@
     "status": null
   },
   {
-    "title": "Жениха вызывали",
-    "description": "Жениха вызывали — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/zhenikha-vyzyvali-1/",
-    "tags": [
-      "Спектакли",
-      "Комедии"
-    ],
-    "date": "2026-10-25 17:00:00",
-    "place": "ГАУК «Театр драмы Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Принцесса цирка",
-    "description": "Принцесса цирка — мероприятие в Кузбассе.",
+    "description": "Оперетта Имре Кальмана о цирковом мире, любви и тайнах происхождения. В центре сюжета — загадочный артист и княгиня, чьи чувства сталкиваются с общественными условностями. Спектакль объединяет музыку и театральное действие.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/princessa-cirka-1/",
     "tags": [
       "Спектакли"
@@ -174,7 +109,7 @@
   },
   {
     "title": "Вадим Самойлов и Агата Кристи",
-    "description": "Вадим Самойлов и Агата Кристи — мероприятие в Кузбассе.",
+    "description": "Концерт Вадима Самойлова с песнями, связанными с творчеством группы «Агата Кристи». Посетители смогут услышать рок-композиции в живом исполнении. Репертуар и условия посещения уточняются у организатора.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/vadim-samoylov-agata-kristi-2/",
     "tags": [
       "Концерты",
@@ -186,22 +121,8 @@
     "status": null
   },
   {
-    "title": "Симфонические хиты. Колесо любви. Concord Orchestra",
-    "description": "Симфонические хиты. Колесо любви. Concord Orchestra — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/sportivnye-kompleksy/sportivno-razvlekatelnyy-kompleks-arena/kemerovo-srk-arena-simfonicheskie-khity-koleso-lyubvi-concord-orchestra/",
-    "tags": [
-      "Концерты",
-      "Классика",
-      "Поп-музыка"
-    ],
-    "date": "2026-11-01 19:00:00",
-    "place": "СРК «Арена»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Запчасти для счастья",
-    "description": "Запчасти для счастья — мероприятие в Кузбассе.",
+    "description": "Комедийный спектакль о людях, которые пытаются наладить личную жизнь и найти своё счастье. Подробный сюжет и состав исполнителей стоит уточнить по ссылке на афишу.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/dkzh-novosibirsk/zapchasti-dlya-schastya-1/",
     "tags": [
       "Спектакли",
@@ -214,7 +135,7 @@
   },
   {
     "title": "Посвящение Полю Мориа",
-    "description": "Посвящение Полю Мориа — мероприятие в Кузбассе.",
+    "description": "Музыкальный вечер, посвящённый творчеству французского композитора и дирижёра Поля Мориа. В центре программы — мелодии, знакомые по оркестровым аранжировкам и инструментальной эстраде.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/dkzh-novosibirsk/posvyaschenie-polyu-moria/",
     "tags": [
       "Классика",
@@ -226,60 +147,8 @@
     "status": null
   },
   {
-    "title": "Мёртвые души",
-    "description": "Мёртвые души — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/doma-kultury/dvorec-kultury-i-iskusstva-g-leninsk-kuzneckiy/spektakl-myortvye-dushi-gleninsk-kuzneckiy/",
-    "tags": [
-      "Спектакли",
-      "Драмы"
-    ],
-    "date": "2026-10-29 18:00:00",
-    "place": "Дворец культуры и искусства (г. Ленинск-Кузнецкий)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Группа «Чиж и Co»",
-    "description": "Группа «Чиж и Co» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/gruppa-chizh-i-co/",
-    "tags": [
-      "Концерты",
-      "Рок"
-    ],
-    "date": "2026-11-06 19:00:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Кемерово: от угольной столицы к культурному центру",
-    "description": "Кемерово: от угольной столицы к культурному центру — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/kemerovo-ot-ugolnoy-stolicy-k-kulturnomu-centru/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-27 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Коста Лакоста",
-    "description": "Коста Лакоста — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/kluby/okean-hall/kosta-lakosta/",
-    "tags": [
-      "Концерты",
-      "Поп-музыка"
-    ],
-    "date": "2026-10-31 19:00:00",
-    "place": "Клуб «Эфир»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Карнавальная ночь",
-    "description": "Карнавальная ночь — мероприятие в Кузбассе.",
+    "description": "Сценическая постановка по мотивам знаменитой новогодней комедии. Праздничные приготовления, музыка, недоразумения и романтические истории создают атмосферу зимнего праздника.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/ksk-uniks/myuzikl-karnavalnaya-noch-egora-druzhinina/",
     "tags": [
       "Мюзиклы"
@@ -291,7 +160,7 @@
   },
   {
     "title": "Волшебный круг",
-    "description": "Волшебный круг — мероприятие в Кузбассе.",
+    "description": "Творческий мастер-класс «Волшебный круг». Участники познакомятся с художественной практикой и выполнят собственную работу под руководством ведущего. Материалы и возраст участников уточняются у организатора.",
     "url": "https://kuzbass.ticketland.ru/drugoe/maudo-dshi-46-g-kemerovo/volshebnyy-krug-master-klass-1/",
     "tags": [
       "Выставки",
@@ -304,62 +173,8 @@
     "status": null
   },
   {
-    "title": "Свидание вслепую",
-    "description": "Свидание вслепую — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/doma-kultury/astrahanskiy-dvorec-kultury-arkadiya/spektakl-svidanie-vslepuyu/",
-    "tags": [
-      "Спектакли",
-      "Драмы"
-    ],
-    "date": "2026-11-05 19:00:00",
-    "place": "Кемеровский Дворец молодежи",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Экскурсия «Подвиг народа. Кузбасс в годы Великой Отечественной войны»",
-    "description": "Экскурсия «Подвиг народа. Кузбасс в годы Великой Отечественной войны» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-voennoy-istorii-kuzbasskogo-kraevedcheskogo-muzeya/podvig-naroda-kuzbass-v-gody-velikoy-otechestvennoy-voyny/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел военной истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Тринадцать карат",
-    "description": "Тринадцать карат — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/kluby/klub-efir-kemerovo/trinadcat-karat-kemerovo-25-oktyabrya-efir/",
-    "tags": [
-      "Концерты",
-      "Поп-музыка",
-      "Рок"
-    ],
-    "date": "2026-10-25 20:00:00",
-    "place": "Клуб «Эфир»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Кукла народов Кузбасса: узоры, цвета, смыслы",
-    "description": "Кукла народов Кузбасса: узоры, цвета, смыслы — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/master-klass-kukla-narodov-kuzbassa-uzory-cveta-smysly/",
-    "tags": [
-      "Выставки",
-      "Саморазвитие",
-      "Мастер-классы"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Бабий бунт",
-    "description": "Бабий бунт — мероприятие в Кузбассе.",
+    "description": "Музыкальная комедия по мотивам одноимённого произведения о казачьем хуторе. Женщины решают выступить против привычного порядка, что приводит к череде смешных ситуаций, споров и примирений.",
     "url": "https://kuzbass.ticketland.ru/teatry/kemerovskiy-filial-rgisi/babiy-bunt-2/",
     "tags": [
       "Спектакли"
@@ -370,48 +185,8 @@
     "status": null
   },
   {
-    "title": "Мультимедийный проект «Космический Микеланджело. Человек  космос»",
-    "description": "Мультимедийный проект «Космический Микеланджело. Человек  космос» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/kuzbasskiy-centr-iskusstv/multimediynyy-proekt-kosmicheskiy-mikelandzhelo-chelovek-kosmos/",
-    "tags": [
-      "Выставки"
-    ],
-    "date": "2026-10-25 12:00:00",
-    "place": "Кузбасский центр искусств",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Страницы Победы. От Москвы до Берлина",
-    "description": "Страницы Победы. От Москвы до Берлина — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-voennoy-istorii-kuzbasskogo-kraevedcheskogo-muzeya/urok-muzhestva-stranicy-pobedy-ot-moskvy-do-berlina/",
-    "tags": [
-      "Выставки",
-      "Саморазвитие",
-      "Мастер-классы",
-      "Лекции"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел военной истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Конёк-Горбунок",
-    "description": "Конёк-Горбунок — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/konyok-gorbunok-3/",
-    "tags": [
-      "От 7-11 лет",
-      "Спектакли"
-    ],
-    "date": "2026-11-07 11:00:00",
-    "place": "Музыкальный театр Кузбасса им. Боброва",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Кубанский казачий хор",
-    "description": "Кубанский казачий хор — мероприятие в Кузбассе.",
+    "description": "Концерт Кубанского казачьего хора — коллектива, исполняющего народные песни и сценические композиции, связанные с традициями Кубани. Программа может включать хоровое пение и танцевальные номера.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/kubanskiy-kazachiy-khor-2/",
     "tags": [
       "Концерты",
@@ -425,7 +200,7 @@
   },
   {
     "title": "Здравствуйте, я ваша тётя!",
-    "description": "Здравствуйте, я ваша тётя! — мероприятие в Кузбассе.",
+    "description": "Комедия по мотивам пьесы Брэндона Томаса «Тётка Чарлея». Друзья устраивают переодевание, чтобы добиться встречи с возлюбленными, но выдуманная родственница оказывается в центре всё более запутанных событий.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-v-khamovnikakh/zdravstvuyte-ya-vasha-tyotya-1/",
     "tags": [
       "Спектакли",
@@ -438,7 +213,7 @@
   },
   {
     "title": "Щелкунчик",
-    "description": "Щелкунчик — мероприятие в Кузбассе.",
+    "description": "Сценическая версия сказки о Щелкунчике и Мари. Волшебные превращения, противостояние Мышиному королю и путешествие в сказочный мир составляют основу постановки.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/schelkunchik-2/",
     "tags": [
       "Классика",
@@ -450,33 +225,8 @@
     "status": null
   },
   {
-    "title": "Мастер-класс \"Практическая хореографическая лаборатория\"",
-    "description": "Мастер-класс \"Практическая хореографическая лаборатория\" — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/kemerovskiy-institut-kultury/master-klass-prakticheskaya-khoreograficheskaya-laboratoriya/",
-    "tags": [
-      "Мастер-классы"
-    ],
-    "date": "2026-10-26 17:00:00",
-    "place": "Кемеровский институт культуры",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Операция «Бриллиантовая рука» или старая контрабанда в новом гипсе",
-    "description": "Операция «Бриллиантовая рука» или старая контрабанда в новом гипсе — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/premeraoperaciya-brilliantovaya-ruka-ili-staraya-kontrabanda-v-novom-gipse/",
-    "tags": [
-      "Спектакли",
-      "Комедии"
-    ],
-    "date": "2026-11-01 17:00:00",
-    "place": "Музыкальный театр Кузбасса им. Боброва",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "В джазе только девушки",
-    "description": "В джазе только девушки — мероприятие в Кузбассе.",
+    "description": "Музыкальный спектакль с джазовыми мотивами и комедийными ситуациями. Герои попадают в необычные обстоятельства, а музыка помогает передать настроение происходящего. Точный сюжет указан в афише организатора.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/v-dzhaze-tolko-devushki-1/",
     "tags": [
       "Концерты",
@@ -490,7 +240,7 @@
   },
   {
     "title": "Михаил Шахназаров. Шах и Мат",
-    "description": "Михаил Шахназаров. Шах и Мат — мероприятие в Кузбассе.",
+    "description": "Сольное выступление Михаила Шахназарова «Шах и Мат». Формат предполагает юмористические и сатирические наблюдения автора; перед посещением рекомендуется проверить возрастную маркировку и содержание программы.",
     "url": "https://kuzbass.ticketland.ru/kluby/bar-birliman/mikhail-shakhnazarov-shakh-i-mat-1/",
     "tags": [
       "Концерты",
@@ -503,7 +253,7 @@
   },
   {
     "title": "Маша и Медведь",
-    "description": "Маша и Медведь — мероприятие в Кузбассе.",
+    "description": "Детский спектакль по мотивам историй о девочке Маше и Медведе. Знакомые персонажи попадают в новые ситуации, учатся дружить и помогать друг другу. Подробности конкретной постановки — в афише театра.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-kukol-kuzbassa-imeni-arkadiya-gaydara/masha-i-medved-1/",
     "tags": [
       "От 3-6 лет",
@@ -515,34 +265,8 @@
     "status": null
   },
   {
-    "title": "Мёртвые души",
-    "description": "Мёртвые души — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/spektakl-myortvye-dushi-1/",
-    "tags": [
-      "Спектакли",
-      "Драмы"
-    ],
-    "date": "2026-10-27 19:00:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Музей для друзей",
-    "description": "Музей для друзей — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/tomskaya-pisanica/ekskursiya-muzey-dlya-druzey/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Музей-заповедник «Томская Писаница»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "GUF «Прощальный тур»",
-    "description": "GUF «Прощальный тур» — мероприятие в Кузбассе.",
+    "description": "Концерт GUF в рамках тура «Прощальный тур». В программе ожидается исполнение рэп-композиций артиста. Возрастные ограничения и условия посещения необходимо проверить на странице организатора.",
     "url": "https://kuzbass.ticketland.ru/sportivnye-kompleksy/sportivno-razvlekatelnyy-kompleks-arena/guf-proschalnyy-tur-kemerovo/",
     "tags": [
       "Концерты",
@@ -554,21 +278,8 @@
     "status": null
   },
   {
-    "title": "Мурат Тхагалегов",
-    "description": "Мурат Тхагалегов — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/kluby/bar-ruki-vverkh-novosibirsk/murat-tkhagalegov/",
-    "tags": [
-      "Концерты",
-      "Поп-музыка"
-    ],
-    "date": "2026-11-06 18:00:00",
-    "place": "Клуб «Эфир»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Маша и Медведь",
-    "description": "Маша и Медведь — мероприятие в Кузбассе.",
+    "description": "Семейное представление с персонажами Машей и Медведем. Зрители увидят приключения знакомых героев, связанные с дружбой, взаимопомощью и забавными недоразумениями.",
     "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/masha-i-medved-2/",
     "tags": [
       "От 3-6 лет",
@@ -583,7 +294,7 @@
   },
   {
     "title": "Сказки высокой горы",
-    "description": "Сказки высокой горы — мероприятие в Кузбассе.",
+    "description": "Кукольный спектакль «Сказки высокой горы». Постановка обращается к сказочным историям и образам; зрителей ждёт театральное путешествие в мир народной фантазии. Сюжет и возрастная маркировка — на сайте театра.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-kukol-kuzbassa-imeni-arkadiya-gaydara/skazki-vysokoy-gory-1/",
     "tags": [
       "Спектакли"
@@ -594,21 +305,8 @@
     "status": null
   },
   {
-    "title": "В отрыв",
-    "description": "В отрыв — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/koncert-v-otryv-2/",
-    "tags": [
-      "Классика",
-      "Концерты"
-    ],
-    "date": "2026-10-31 18:00:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Тень",
-    "description": "Тень — мероприятие в Кузбассе.",
+    "description": "Спектакль «Тень» по мотивам пьесы Евгения Шварца. Учёный сталкивается с собственной Тенью, которая начинает самостоятельную жизнь и стремится занять его место. Сказочный сюжет поднимает вопросы выбора и честности.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-kukol-kuzbassa-imeni-arkadiya-gaydara/ten-1/",
     "tags": [
       "Спектакли",
@@ -620,71 +318,8 @@
     "status": null
   },
   {
-    "title": "Мастер-класс \"Соло: от идеи до сцены\"",
-    "description": "Мастер-класс \"Соло: от идеи до сцены\" — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/kemerovskiy-institut-kultury/master-klass-solo-ot-idei-do-sceny/",
-    "tags": [
-      "Мастер-классы"
-    ],
-    "date": "2026-10-27 13:30:00",
-    "place": "Кемеровский институт культуры",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Три красавицы",
-    "description": "Три красавицы — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/tri-krasavicy-1/",
-    "tags": [
-      "Спектакли",
-      "Мюзиклы"
-    ],
-    "date": "2026-11-03 19:00:00",
-    "place": "Музыкальный театр Кузбасса им. Боброва",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Выставка молодежного искусства «Арт-статус»",
-    "description": "Выставка молодежного искусства «Арт-статус» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/kuzbasskiy-centr-iskusstv/vystavka-molodezhnogo-iskusstva-art-status/",
-    "tags": [
-      "Выставки"
-    ],
-    "date": "2026-10-26 11:00:00",
-    "place": "Кузбасский центр искусств",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Программа «Пушкинские выходные»",
-    "description": "Программа «Пушкинские выходные» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/tomskaya-pisanica/programma-pushkinskie-vykhodnye/",
-    "tags": [
-      "Выставки",
-      "Мастер-классы"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Музей-заповедник «Томская Писаница»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Алексей Петрухин",
-    "description": "Алексей Петрухин — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/aleksey-petrukhin-3/",
-    "tags": [
-      "Концерты",
-      "Народная музыка"
-    ],
-    "date": "2026-11-01 19:00:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Щелкунчик",
-    "description": "Щелкунчик — мероприятие в Кузбассе.",
+    "description": "Балет или сценическое представление по мотивам сказки о Щелкунчике. Мари попадает в волшебный мир игрушек, где разворачивается борьба с Мышиным королём. Формат постановки уточняется по ссылке.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/zabaykalskaya-kraevaya-filarmoniya/schelkunchik-balet-1/",
     "tags": [
       "Классика",
@@ -700,7 +335,7 @@
   },
   {
     "title": "«Голубая камея»",
-    "description": "«Голубая камея» — мероприятие в Кузбассе.",
+    "description": "Музыкальная постановка «Голубая камея» с историческим сюжетом, романтической линией и сценическими вокальными номерами. Подробное содержание и состав исполнителей представлены в афише театра.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/golubaya-kameya-1/",
     "tags": [
       "Мюзиклы"
@@ -712,7 +347,7 @@
   },
   {
     "title": "Призрак замка Кентервиль",
-    "description": "Призрак замка Кентервиль — мероприятие в Кузбассе.",
+    "description": "Спектакль по мотивам произведения Оскара Уайльда. В старинном замке живёт привидение, но новые обитатели совсем не собираются его бояться. История сочетает юмор, тайну и трогательные моменты.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/prizrak-zamka-kentervil-2/",
     "tags": [
       "Спектакли"
@@ -724,7 +359,7 @@
   },
   {
     "title": "Новогодняя Премьера! «Двенадцать месяцев» от режиссёра Московского театра Н. Сац В. Меркулова",
-    "description": "Новогодняя Премьера! «Двенадцать месяцев» от режиссёра Московского театра Н. Сац В. Меркулова — мероприятие в Кузбассе.",
+    "description": "Новогодняя сказочная постановка по мотивам «Двенадцати месяцев». Героиня отправляется в зимний лес за подснежниками и встречает двенадцать братьев-месяцев. Перед посещением следует уточнить программу: ссылка в исходном каталоге имеет другое название.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/dvorec-molodyozhi-ekaterinburg/moskovskaya-skazka-volshebnik-izumrudnogo-goroda-v-dni-novogodnikh-kanikul-ot-rezhissyora-moskovskogo-teatra-n-sac-v-merkulova/",
     "tags": [
       "От 3-6 лет",
@@ -737,7 +372,7 @@
   },
   {
     "title": "Дядя Ваня",
-    "description": "Дядя Ваня — мероприятие в Кузбассе.",
+    "description": "Спектакль по пьесе А. П. Чехова. Дядя Ваня, Соня и другие герои живут в усадьбе, переживая разочарования, несбывшиеся надежды и сложные отношения. Постановка обращается к вопросам труда, любви и смысла жизни.",
     "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/dyadya-vanya-8/",
     "tags": [
       "Спектакли",
@@ -749,84 +384,8 @@
     "status": null
   },
   {
-    "title": "Экспозиция «Место Кузбасса на планете»",
-    "description": "Экспозиция «Место Кузбасса на планете» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-prirody-kuzbasskogo-kraevedcheskogo-muzeya/mesto-kuzbassa-na-planete/",
-    "tags": [
-      "Выставки"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел природы Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "А вам и не снилось",
-    "description": "А вам и не снилось — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/kemerovskiy-filial-rgisi/a-vam-i-ne-snilos/",
-    "tags": [
-      "Спектакли"
-    ],
-    "date": "2026-10-27 18:30:00",
-    "place": "Кемеровский филиал РГИСИ",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "По следам древних морей",
-    "description": "По следам древних морей — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-prirody-kuzbasskogo-kraevedcheskogo-muzeya/tematicheskaya-ekskursiya-po-sledam-drevnikh-morey/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел природы Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Итак, она звалась Татьяной",
-    "description": "Итак, она звалась Татьяной — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/kemerovskiy-institut-kultury/itak-ona-zvalas-tatyanoy-1/",
-    "tags": [
-      "Спектакли",
-      "Драмы"
-    ],
-    "date": "2026-11-01 13:00:00",
-    "place": "Кемеровский институт культуры",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Лена Василек",
-    "description": "Лена Василек — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-alyuminschik/lena-vasilek-gnovokuzneck/",
-    "tags": [
-      "Концерты",
-      "Поп-музыка"
-    ],
-    "date": "2026-10-30 19:00:00",
-    "place": "ДК «Алюминщик» (г. Новокузнецк)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Женский мир",
-    "description": "Женский мир — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/ekskursiya-zhenskiy-mir/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Мойдодыр",
-    "description": "Мойдодыр — мероприятие в Кузбассе.",
+    "description": "Детский музыкальный спектакль по сказке Корнея Чуковского. Неряшливый мальчик встречает строгого Мойдодыра и узнаёт, почему важно соблюдать чистоту и порядок.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/spektakl-moydodyr/",
     "tags": [
       "От 3-6 лет",
@@ -838,62 +397,8 @@
     "status": null
   },
   {
-    "title": "Чебатуха",
-    "description": "Чебатуха — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/koncert-chebatukha/",
-    "tags": [
-      "Концерты",
-      "Шоу",
-      "Народная музыка",
-      "Хореография"
-    ],
-    "date": "2026-10-30 19:30:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Сектор газа. Посвящение Юрию Хою",
-    "description": "Сектор газа. Посвящение Юрию Хою — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-alyuminschik/posvyaschenie-yuriyu-khoyu-g-novokuzneck/",
-    "tags": [
-      "Концерты",
-      "Рок"
-    ],
-    "date": "2026-10-27 19:00:00",
-    "place": "ДК «Алюминщик» (г. Новокузнецк)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Входной билет в музей, выходной день",
-    "description": "Входной билет в музей, выходной день — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/tomskaya-pisanica/vkhodnoy-bilet-v-muzey-vykhodnoy-den/",
-    "tags": [
-      "Выставки"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Музей-заповедник «Томская Писаница»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Ступени к мастерству: мастер-класс по эстрадному вокалу, меняющий жизнь!",
-    "description": "Ступени к мастерству: мастер-класс по эстрадному вокалу, меняющий жизнь! — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/dshi-5-g-kemerovo/stupeni-k-masterstvu-master-klass-po-estradnomu-vokalu-menyayuschiy-zhizn/",
-    "tags": [
-      "Выставки",
-      "Саморазвитие",
-      "Мастер-классы"
-    ],
-    "date": "2026-10-26 19:00:00",
-    "place": "ДШИ № 5 (г. Кемерово)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Группа «Воровайки»",
-    "description": "Группа «Воровайки» — мероприятие в Кузбассе.",
+    "description": "Концерт группы «Воровайки». Программа связана с песенным репертуаром коллектива в жанре шансона. Перед посещением необходимо проверить возрастную маркировку и содержание выступления.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-alyuminschik/vorovayki-g-novokuzneck/",
     "tags": [
       "Концерты",
@@ -906,7 +411,7 @@
   },
   {
     "title": "Рок",
-    "description": "Рок — мероприятие в Кузбассе.",
+    "description": "Музыкальная постановка «Рок». В спектакле используются театральные и музыкальные средства, связанные с рок-культурой. Точную программу и сюжет следует уточнить в афише театра.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/rok-1/",
     "tags": [
       "Мюзиклы"
@@ -917,22 +422,8 @@
     "status": null
   },
   {
-    "title": "140 ударов в минуту",
-    "description": "140 ударов в минуту — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/teatr-dlya-detey-i-molodyozhi/140-udarov-v-minutu/",
-    "tags": [
-      "Спектакли",
-      "Драмы",
-      "От 12-15 лет"
-    ],
-    "date": "2026-10-31 17:00:00",
-    "place": "Театр для детей и молодёжи",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Заплатки",
-    "description": "Заплатки — мероприятие в Кузбассе.",
+    "description": "Спектакль театра кукол «Заплатки». Зрители познакомятся с историей, рассказанной средствами кукольного театра. Подробности сюжета, продолжительности и возрастной маркировки указаны у организатора.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-kukol-kuzbassa-imeni-arkadiya-gaydara/zaplatki-1/",
     "tags": [
       "От 12-15 лет"
@@ -944,7 +435,7 @@
   },
   {
     "title": "Кобяков",
-    "description": "Кобяков — мероприятие в Кузбассе.",
+    "description": "Сценическое выступление Кобякова для детской и семейной аудитории. Программа предполагает песни и общение со зрителями; детали участия и возрастные условия опубликованы на странице мероприятия.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/cdk-g-belovo/kobyakov-belovo/",
     "tags": [
       "Спектакли",
@@ -959,21 +450,8 @@
     "status": null
   },
   {
-    "title": "Музыка - волшебная страна",
-    "description": "Музыка - волшебная страна — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/cdshi-g-kemerovo/koncert-muzyka-volshebnaya-strana/",
-    "tags": [
-      "Классика",
-      "Концерты"
-    ],
-    "date": "2026-11-01 12:00:00",
-    "place": "ЦДШИ (г. Кемерово)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "«Симфония Ведьмак при свечах - Оркестр КАГМО»",
-    "description": "«Симфония Ведьмак при свечах - Оркестр КАГМО» — мероприятие в Кузбассе.",
+    "description": "Оркестровый концерт музыки по мотивам вселенной «Ведьмака». Знакомые музыкальные темы прозвучат в инструментальном исполнении при атмосферном освещении свечами.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/simfoniya-vedmak-pri-svechakh-orkestr-kagmo/",
     "tags": [
       "Классика",
@@ -986,7 +464,7 @@
   },
   {
     "title": "История местечка, которого больше нет",
-    "description": "История местечка, которого больше нет — мероприятие в Кузбассе.",
+    "description": "Спектакль «История местечка, которого больше нет» обращается к памяти о людях и исчезнувшем мире небольшого поселения. Постановка предлагает взглянуть на прошлое через личные истории и театральные образы.",
     "url": "https://kuzbass.ticketland.ru/teatry/kemerovskiy-filial-rgisi/istoriya-mestechka-kotorogo-bolshe-net/",
     "tags": [
       "Спектакли"
@@ -998,7 +476,7 @@
   },
   {
     "title": "Щелкунчик и Мышиный король",
-    "description": "Щелкунчик и Мышиный король — мероприятие в Кузбассе.",
+    "description": "Новогоднее представление по мотивам сказки о Щелкунчике и Мышином короле. Игрушки оживают, Мари становится участницей волшебных событий, а борьба добра со злом разворачивается в праздничной атмосфере.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/novogodnee-predstavlenie-schelkunchik-i-myshinyy-korol-1/",
     "tags": [
       "От 3-6 лет",
@@ -1011,22 +489,8 @@
     "status": null
   },
   {
-    "title": "Ночь искусств",
-    "description": "Ночь искусств — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/maudo-dshi-45-g-kemerovo/koncertnaya-programma-noch-iskusstv/",
-    "tags": [
-      "Концерты",
-      "Классика",
-      "Джаз"
-    ],
-    "date": "2026-11-03 18:30:00",
-    "place": "МАУДО «ДШИ № 45» (г. Кемерово)",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Эхо Анны Герман",
-    "description": "Эхо Анны Герман — мероприятие в Кузбассе.",
+    "description": "Музыкальный вечер памяти Анны Герман. Программа посвящена лирическим песням, связанным с творчеством певицы; слушателей ждут знакомые мелодии и вокальные исполнения.",
     "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/koncert-ekho-anny-german/",
     "tags": [
       "Классика"
@@ -1037,20 +501,8 @@
     "status": null
   },
   {
-    "title": "История Герды",
-    "description": "История Герды — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/teatry/muzykalnyy-teatr-kuzbassa-imbobrova/istoriya-gerdy-1/",
-    "tags": [
-      "Мюзиклы"
-    ],
-    "date": "2026-10-31 11:00:00",
-    "place": "Музыкальный театр Кузбасса им. Боброва",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Турецкие сериалы",
-    "description": "Турецкие сериалы — мероприятие в Кузбассе.",
+    "description": "Мультимедийное шоу саундтреков из турецких сериалов. Музыка известных экранных историй сочетается со сценическим оформлением; состав произведений уточняется на странице организатора.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/multimediynoe-shou-saundtrekov-tureckie-serialy-1/",
     "tags": [
       "Шоу"
@@ -1062,7 +514,7 @@
   },
   {
     "title": "Оркестр CAGMO. Симфония Майкла Джексона при свечах",
-    "description": "Оркестр CAGMO. Симфония Майкла Джексона при свечах — мероприятие в Кузбассе.",
+    "description": "Оркестровая программа CAGMO, посвящённая музыке Майкла Джексона. Известные поп-мелодии представлены в инструментальных аранжировках и атмосфере концерта при свечах.",
     "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-alyuminschik/simfoniya-maykla-dzheksona-pri-svechakh-orkestr-cagmo-koncert-v-novokuznecke/",
     "tags": [
       "Концерты",
@@ -1076,7 +528,7 @@
   },
   {
     "title": "Ку-ка-ре-ку!",
-    "description": "Ку-ка-ре-ку! — мероприятие в Кузбассе.",
+    "description": "Кукольный спектакль для маленьких зрителей «Ку-ка-ре-ку!». Представление знакомит детей с театральными персонажами через игру, движение и короткую сценическую историю.",
     "url": "https://kuzbass.ticketland.ru/teatry/teatr-kukol-kuzbassa-imeni-arkadiya-gaydara/ku-ka-re-ku-1/",
     "tags": [
       "От 3-6 лет",
@@ -1088,37 +540,8 @@
     "status": null
   },
   {
-    "title": "Экскурсия «Ближе к звездам»",
-    "description": "Экскурсия «Ближе к звездам» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/ekskursiya-blizhe-k-zvezdam/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Музейное занятие «Огненные гончары»",
-    "description": "Музейное занятие «Огненные гончары» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/ognennye-gonchary/",
-    "tags": [
-      "Выставки",
-      "Саморазвитие",
-      "От 7-11 лет",
-      "От 12-15 лет",
-      "Мастер-классы"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Ах, Боже мой, премьера!",
-    "description": "Ах, Боже мой, премьера! — мероприятие в Кузбассе.",
+    "description": "Театральная постановка «Ах, Боже мой, премьера!». Спектакль посвящён сценической жизни и переживаниям героев; конкретный сюжет и возрастные ограничения необходимо уточнить в афише.",
     "url": "https://kuzbass.ticketland.ru/teatry/kemerovskiy-filial-rgisi/akh-bozhe-moy-premera-1/",
     "tags": [
       "Спектакли"
@@ -1130,7 +553,7 @@
   },
   {
     "title": "Виктор Салтыков",
-    "description": "Виктор Салтыков — мероприятие в Кузбассе.",
+    "description": "Концерт Виктора Салтыкова. В программе могут прозвучать известные эстрадные песни из репертуара исполнителя. Точный список композиций и продолжительность уточняются у организатора.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/viktor-saltykov-2/",
     "tags": [
       "Концерты",
@@ -1143,7 +566,7 @@
   },
   {
     "title": "Однажды Насреддин",
-    "description": "Однажды Насреддин — мероприятие в Кузбассе.",
+    "description": "Спектакль «Однажды Насреддин» по мотивам историй о находчивом мудреце Ходже Насреддине. Юмор, хитроумные ответы и неожиданные решения помогают героям выходить из сложных ситуаций.",
     "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/odnazhdy-nasreddin/",
     "tags": [
       "Спектакли"
@@ -1155,7 +578,7 @@
   },
   {
     "title": "Марина",
-    "description": "Марина — мероприятие в Кузбассе.",
+    "description": "Спектакль «Марина». Постановка рассказывает историю героини и её отношений с окружающим миром. Подробности сюжета и возрастная маркировка доступны на странице театральной афиши.",
     "url": "https://kuzbass.ticketland.ru/teatry/kamernyy-teatr-sovremennoy-poezii-litera-na-sovetskom/muzykalno-poeticheskiy-spektakl-marina/",
     "tags": [
       "Спектакли"
@@ -1166,35 +589,8 @@
     "status": null
   },
   {
-    "title": "Экскурсия «Кузнецкая земля: история и наследие»",
-    "description": "Экскурсия «Кузнецкая земля: история и наследие» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-istorii-kuzbasskogo-kraevedcheskogo-muzeya/kuzneckaya-zemlya-istoriya-i-nasledie/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел истории Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Простейшие ритмы на ударной установке",
-    "description": "Простейшие ритмы на ударной установке — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/drugoe/maudo-dshi-61/master-klass-prosteyshie-ritmy-na-udarnoy-ustanovke/",
-    "tags": [
-      "Выставки",
-      "Саморазвитие",
-      "Мастер-классы"
-    ],
-    "date": "2026-10-29 13:00:00",
-    "place": "МАУДО «ДШИ №61»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Приходи на меня посмотреть",
-    "description": "Приходи на меня посмотреть — мероприятие в Кузбассе.",
+    "description": "Спектакль «Приходи на меня посмотреть» — история о семье, одиночестве и неожиданной возможности изменить привычную жизнь. В центре сюжета — отношения близких людей и предновогодняя атмосфера.",
     "url": "https://kuzbass.ticketland.ru/teatry/gauk-teatr-dramy-kuzbassa/prikhodi-na-menya-posmotret-2/",
     "tags": [
       "Спектакли",
@@ -1206,21 +602,8 @@
     "status": null
   },
   {
-    "title": "Basso ostinato",
-    "description": "Basso ostinato — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/basso-ostinato/",
-    "tags": [
-      "Классика",
-      "Концерты"
-    ],
-    "date": "2026-10-25 17:00:00",
-    "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Группа «Бутырка»",
-    "description": "Группа «Бутырка» — мероприятие в Кузбассе.",
+    "description": "Концерт группы «Бутырка», исполняющей песни в жанре русского шансона. Репертуар и возрастные ограничения необходимо проверить у организатора.",
     "url": "https://kuzbass.ticketland.ru/koncertnye-zaly/kemerovskaya-filarmoniya-imeni-shtokolova/gruppa-butyrka-1/",
     "tags": [
       "Концерты",
@@ -1228,33 +611,6 @@
     ],
     "date": "2026-11-13 19:00:00",
     "place": "ГАУК «Филармония Кузбасса»",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Виртуальная экскурсия «Мир динозавров»",
-    "description": "Виртуальная экскурсия «Мир динозавров» — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/muzei/otdel-prirody-kuzbasskogo-kraevedcheskogo-muzeya/virtualnaya-ekskursiya-mir-dinozavrov/",
-    "tags": [
-      "Экскурсии",
-      "Пешие экскурсии"
-    ],
-    "date": "2026-10-25 10:00:00",
-    "place": "Отдел природы Кузбасского краеведческого музея",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Барбоскины цирк",
-    "description": "Барбоскины цирк — мероприятие в Кузбассе.",
-    "url": "https://kuzbass.ticketland.ru/doma-kultury/dk-centralnyy-g-anzhero-sudzhensk/anzhero-sudzhensk-27-oktyabrya-barboskiny-cirk/",
-    "tags": [
-      "От 3-6 лет",
-      "От 7-11 лет",
-      "Цирковое шоу"
-    ],
-    "date": "2026-10-27 18:30:00",
-    "place": "ДК Центральный",
     "format": "офлайн",
     "status": null
   },
@@ -1271,30 +627,6 @@
     "status": null
   },
   {
-    "title": "Информационный проект «Поколения Первых: Семейная Летопись»",
-    "description": "Информационный проект «Поколения Первых: Семейная Летопись». Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
-    "url": "https://projects.pervye.ru/projects/e3e59cd8-889d-44fd-ada4-9f454d60bb6d",
-    "tags": [
-      "Движение Первых"
-    ],
-    "date": "2026-09-01 — 2026-10-31",
-    "place": "Кемеровская область — Кузбасс",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Региональный конкурс «Лучший медиацентр местного отделения»",
-    "description": "Региональный конкурс «Лучший медиацентр местного отделения». Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
-    "url": "https://projects.pervye.ru/projects/918a3634-3112-4a1e-aa42-135e61433bd9",
-    "tags": [
-      "Движение Первых"
-    ],
-    "date": "2026-09-01 — 2026-09-20",
-    "place": "Кемеровская область — Кузбасс",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Региональный проект «Флагманы возможностей» 2026–2027",
     "description": "Региональный проект «Флагманы возможностей» 2026–2027. Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
     "url": "https://projects.pervye.ru/projects/8b4313c5-7a8c-4adf-8a6d-03006491c954",
@@ -1302,18 +634,6 @@
       "Движение Первых"
     ],
     "date": "2026-08-21 — 2027-01-31",
-    "place": "Кемеровская область — Кузбасс",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Региональный слёт для наставников Движения Первых",
-    "description": "Региональный слёт для наставников Движения Первых. Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
-    "url": "https://projects.pervye.ru/projects/b803307f-2277-48e7-8895-1e754689f93e",
-    "tags": [
-      "Движение Первых"
-    ],
-    "date": "2026-08-01 — 2026-10-14",
     "place": "Кемеровская область — Кузбасс",
     "format": "офлайн",
     "status": null
@@ -1343,18 +663,6 @@
     "status": null
   },
   {
-    "title": "Конкурс «История в чемодане»",
-    "description": "Конкурс «История в чемодане». Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
-    "url": "https://projects.pervye.ru/projects/0d813892-39a2-41e8-b1a6-9a95b4cda6d7",
-    "tags": [
-      "Движение Первых"
-    ],
-    "date": "2026-03-01 — 2026-09-30",
-    "place": "Кемеровская область — Кузбасс",
-    "format": "офлайн",
-    "status": null
-  },
-  {
     "title": "Торжественные церемонии вступления в Движение Первых",
     "description": "Торжественные церемонии вступления в Движение Первых. Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
     "url": "https://projects.pervye.ru/projects/b01e44b1-cab2-4185-a57f-ad95aec4c0cd",
@@ -1362,18 +670,6 @@
       "Движение Первых"
     ],
     "date": "2026-01-09 — 2026-12-25",
-    "place": "Кемеровская область — Кузбасс",
-    "format": "офлайн",
-    "status": null
-  },
-  {
-    "title": "Региональный слёт Школы актива",
-    "description": "Региональный слёт Школы актива. Региональная программа Движения Первых в Кемеровской области — Кузбассе.",
-    "url": "https://projects.pervye.ru/super-projects/1c9bef0b-f5bc-4928-b003-44f23dd3d81f",
-    "tags": [
-      "Движение Первых"
-    ],
-    "date": "2026-08-01 — 2026-10-29",
     "place": "Кемеровская область — Кузбасс",
     "format": "офлайн",
     "status": null
@@ -1496,6 +792,323 @@
     "date": "бессрочно",
     "place": "Кемеровская область — Кузбасс",
     "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "МетаШкола: конкурс по шахматам «Выигрыш лёгкой фигуры»",
+    "description": "Интернет-конкурс по шахматам от МетаШколы. Задания посвящены тактическому выигрышу фигуры; правила участия опубликованы у организатора.",
+    "url": "https://metaschool.ru/pub/konkurs/index.php?studioId=4180",
+    "tags": [
+      "Саморазвитие",
+      "От 7-11 лет",
+      "От 12-15 лет"
+    ],
+    "date": "2026-11-10",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "status": null
+  },
+  {
+    "title": "Попрыгунья",
+    "description": "Постановка по рассказу А. П. Чехова: герои ищут признания и учатся отличать внешнюю славу от настоящих ценностей. 12+.",
+    "date": "2026-11-11 12:00:00",
+    "url": "https://kem.burocultura.ru/events/poprygunya-4",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Спектакли",
+      "Драмы",
+      "От 12-15 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "МетаШкола: конкурс по Python «Крошка Питон: Работа над ошибками»",
+    "description": "Интернет-конкурс по программированию на Python. Участники решают задания на понимание и исправление ошибок в программах.",
+    "url": "https://metaschool.ru/pub/konkurs/index.php?studioId=4181",
+    "tags": [
+      "Саморазвитие",
+      "От 12-15 лет",
+      "От 16-18 лет"
+    ],
+    "date": "2026-11-13",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "status": null
+  },
+  {
+    "title": "МетаШкола: математический конкурс «Тик-так-логик»",
+    "description": "Интернет-конкурс по математике от МетаШколы. Участники выполняют логические и математические задания.",
+    "url": "https://metaschool.ru/pub/konkurs/index.php?studioId=4174",
+    "tags": [
+      "Саморазвитие",
+      "От 7-11 лет",
+      "От 12-15 лет"
+    ],
+    "date": "2026-11-15",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "status": null
+  },
+  {
+    "title": "Родное слово — осенний конкурс по русскому языку",
+    "description": "Конкурс для учеников 1–11 классов, проводится школами в один из двух периодов: 18–20 или 25–27 ноября; подача заявок до 13 ноября.",
+    "date": "2026-11-18 - 2026-11-27",
+    "url": "https://cdoo.ru/konkursy",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "tags": [
+      "Саморазвитие",
+      "От 7-11 лет",
+      "От 12-15 лет",
+      "От 16-18 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Снежная королева",
+    "description": "Сценическая история по мотивам сказки о Герде и Кае. Подходит для семейного посещения; возрастные условия указаны организатором.",
+    "url": "https://kem.burocultura.ru/events/snezhnaya-koroleva-21",
+    "tags": [
+      "Спектакли",
+      "От 7-11 лет",
+      "От 12-15 лет"
+    ],
+    "date": "2026-11-21 11:00:00",
+    "place": "ГАУК «Филармония Кузбасса»",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Вне времени и жанра",
+    "description": "Музыкальная программа филармонии, объединяющая произведения и стили. Афиша и состав исполнителей — на сайте события.",
+    "url": "https://kem.burocultura.ru/events/vne-vremeni-i-zhanra",
+    "tags": [
+      "Концерты",
+      "Живая музыка"
+    ],
+    "date": "2026-11-27 18:30:00",
+    "place": "ГАУК «Филармония Кузбасса»",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Летучий корабль",
+    "description": "Музыкальная сказка о любви, смелости и приключениях. Спектакль для семейной аудитории.",
+    "url": "https://kem.burocultura.ru/events/letuchiy-korabl-5",
+    "tags": [
+      "Мюзиклы",
+      "Спектакли",
+      "От 7-11 лет"
+    ],
+    "date": "2026-11-28 11:00:00",
+    "place": "Музыкальный театр Кузбасса им. А. Боброва",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Золотой век барокко",
+    "description": "Концерт, посвящённый музыке барокко. Возможность познакомиться с историческими стилями и звучанием классических произведений.",
+    "url": "https://kem.burocultura.ru/events/zolotoy-vek-barokko",
+    "tags": [
+      "Концерты",
+      "Классика",
+      "Живая музыка"
+    ],
+    "date": "2026-11-28 16:00:00",
+    "place": "ГАУК «Филармония Кузбасса»",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Алексей Глызин",
+    "description": "Концерт Алексея Глызина в Кемерове. В программе — известные песни исполнителя; подробности на странице афиши.",
+    "url": "https://kem.burocultura.ru/events/aleksey-glyzin-6",
+    "tags": [
+      "Концерты",
+      "Поп-музыка"
+    ],
+    "date": "2026-12-01 19:00:00",
+    "place": "ГАУК «Филармония Кузбасса»",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Мельница: Юбилейный тур",
+    "description": "Юбилейный концерт группы «Мельница» — песни коллектива и живое исполнение в Кемерове.",
+    "url": "https://kem.burocultura.ru/events/melnitsa-yubileynyy-tur-3",
+    "tags": [
+      "Концерты",
+      "Рок",
+      "Народная музыка"
+    ],
+    "date": "2026-12-04 19:00:00",
+    "place": "ГАУК «Филармония Кузбасса»",
+    "format": "офлайн",
+    "status": null
+  },
+  {
+    "title": "Мифы, легенды, предания и сказки",
+    "description": "Музыкальная программа по мотивам сказаний и фольклорных сюжетов. 6+.",
+    "date": "2026-12-05 11:00:00",
+    "url": "https://kem.burocultura.ru/events/mify-legendy-predaniya-i-skazki",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Концерты",
+      "Народная музыка",
+      "От 7-11 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Новые имена",
+    "description": "Концертная программа филармонии с музыкальными исполнениями; подробности опубликованы на странице афиши. 6+.",
+    "date": "2026-12-05 13:00:00",
+    "url": "https://kem.burocultura.ru/events/novye-imena",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Концерты",
+      "Классика"
+    ],
+    "status": null
+  },
+  {
+    "title": "Зимние забавы",
+    "description": "Зимняя семейная концертная программа филармонии Кузбасса. 6+.",
+    "date": "2026-12-05 16:00:00",
+    "url": "https://kem.burocultura.ru/events/zimnie-zabavy",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Концерты",
+      "Шоу",
+      "От 7-11 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Три кота: Котополис!",
+    "description": "Семейное детское представление по мотивам мультсериала о трёх котах. 0+.",
+    "date": "2026-12-06 12:00:00",
+    "url": "https://kem.burocultura.ru/events/tri-kota-kotopolis",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Шоу",
+      "Спектакли",
+      "От 3-6 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Северсталь для школьников: онлайн-отборочный этап",
+    "description": "Онлайн-отборочный этап олимпиады по физике и математике. Регистрация до 20 декабря; условия — на сайте организатора.",
+    "date": "2026-12-14 - 2026-12-20",
+    "url": "https://olympiad.severstal.com/olymp",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "tags": [
+      "Саморазвитие",
+      "От 12-15 лет",
+      "От 16-18 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Детское шоу «Хахалики»",
+    "description": "Интерактивное семейное шоу для детей в Кемеровском дворце молодёжи. 0+.",
+    "date": "2026-12-14 18:00:00",
+    "url": "https://kem.burocultura.ru/events/detskoe-shou-hahaliki-2",
+    "place": "Кемеровский Дворец молодежи",
+    "format": "офлайн",
+    "tags": [
+      "Шоу",
+      "От 3-6 лет",
+      "От 7-11 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Тайны оркестрового дворца",
+    "description": "Познавательная музыкальная программа о мире симфонического оркестра. 6+.",
+    "date": "2027-01-20 13:00:00",
+    "url": "https://kem.burocultura.ru/events/tayny-orkestrovogo-dvortsa",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Концерты",
+      "Саморазвитие"
+    ],
+    "status": null
+  },
+  {
+    "title": "Эврика — математический конкурс 2026/27",
+    "description": "Конкурс по математике для учеников 1–11 классов. Школы выбирают одно из окон проведения: 27–29 января или 3–5 февраля. Регистрация до 22 января.",
+    "date": "2027-01-27 - 2027-02-05",
+    "url": "https://cdoo.ru/",
+    "place": "Онлайн, вся Россия",
+    "format": "онлайн",
+    "tags": [
+      "Саморазвитие",
+      "От 7-11 лет",
+      "От 12-15 лет",
+      "От 16-18 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Открытие сезона Губернаторского симфонического оркестра",
+    "description": "Торжественная симфоническая программа оркестра филармонии Кузбасса. 6+.",
+    "date": "2027-01-27 17:00:00",
+    "url": "https://kem.burocultura.ru/events/otkrytie-kontsertnogo-sezona-gubernatorskogo-simfonicheskogo-orkestra",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Концерты",
+      "Классика"
+    ],
+    "status": null
+  },
+  {
+    "title": "Остров детства",
+    "description": "Семейный спектакль для детей. 6+.",
+    "date": "2027-02-11 11:00:00",
+    "url": "https://kem.burocultura.ru/events/ostrov-detstva",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Спектакли",
+      "От 7-11 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Как Иван своё счастье искал",
+    "description": "Семейная сказочная постановка о путешествии Ивана. 0+.",
+    "date": "2027-02-13 13:00:00",
+    "url": "https://kem.burocultura.ru/events/kak-ivan-svoe-schaste-iskal",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Спектакли",
+      "От 7-11 лет"
+    ],
+    "status": null
+  },
+  {
+    "title": "Тиша: Курс на мультфильмы",
+    "description": "Семейная программа по мотивам мультфильмов. 6+.",
+    "date": "2027-02-20 11:00:00",
+    "url": "https://kem.burocultura.ru/events/tisha-kurs-na-multfilmy",
+    "place": "ГАУК «Филармония Кузбасса» (Кемерово)",
+    "format": "офлайн",
+    "tags": [
+      "Шоу",
+      "Концерты",
+      "От 7-11 лет"
+    ],
     "status": null
   }
 ]
