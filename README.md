@@ -85,9 +85,9 @@ docker compose ps
 в той же папке проекта выполните:
 
 ```powershell
-$env:BOT_IMAGE = "ghcr.io/yarikk201/place-meeting:dev"
+$env:BOT_IMAGE = "ghcr.io/yarikk201/place-meeting:latest"
 docker compose pull bot
-docker compose up -d --no-build --pull always
+docker compose up -d --no-build
 ```
 
 Этот способ требует доступного опубликованного пакета в
