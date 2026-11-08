@@ -18,7 +18,7 @@ Docker Desktop и дождитесь готовности. Нужен режим
 
 ### 2. Скачайте проект
 
-Откройте [ветку dev на GitHub](https://github.com/YarikK201/Place-meeting/tree/dev).
+Откройте [ветку main на GitHub](https://github.com/YarikK201/Place-meeting).
 Убедитесь, что над списком файлов выбрана **dev**. Нажмите **Code → Download ZIP**.
 Распакуйте архив. Откройте папку, в которой находятся `compose.yaml` и `Dockerfile`.
 
