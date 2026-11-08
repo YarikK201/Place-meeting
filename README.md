@@ -19,7 +19,7 @@ Docker Desktop и дождитесь готовности. Нужен режим
 ### 2. Скачайте проект
 
 Откройте [ветку main на GitHub](https://github.com/YarikK201/Place-meeting).
-Убедитесь, что над списком файлов выбрана **dev**. Нажмите **Code → Download ZIP**.
+Убедитесь, что над списком файлов выбрана **main**. Нажмите **Code → Download ZIP**.
 Распакуйте архив. Откройте папку, в которой находятся `compose.yaml` и `Dockerfile`.
 
 ### 3. Откройте PowerShell
