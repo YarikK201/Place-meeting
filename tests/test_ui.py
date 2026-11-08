@@ -132,7 +132,7 @@ class InterfaceTests(NavigationCase):
         with catalog.connect() as db:db.execute("INSERT INTO friendship_requests VALUES (2,1,'pending','2026')")
         await app.dispatch(1,['req','reject','2']);await asyncio.gather(*list(app._NOTIFY_TASKS))
         args=self.transport.send_message.call_args.kwargs
-        self.assertIn('Анна не принял твою заявку в друзья',args['text'])
+        self.assertIn('Анна отклонил(-а) твою заявку.',args['text'])
         self.assertEqual(len(args['attachments'][0].payload.buttons),2)
 
     async def test_16_teacher_approval_home_button(self):

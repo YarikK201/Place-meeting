@@ -267,7 +267,7 @@ def menu(uid):
         if social.pending(uid, True) or social.pending(uid, False):
             rows.insert(-1,[b('📩 Заявки','req:in:0')])
     if te.is_moderator(uid): rows.append([b('🛡 Модерация','mod:home')])
-    return ui('🏠 Главное меню',rows)
+    return ui('🏠 Приветствуем тебя на Месте встречи! Ну что, какие планы?' if p and p['role']=='student' and not te.is_moderator(uid) else '🏠 Главное меню',rows)
 
 
 def role_screen(uid):
@@ -279,7 +279,7 @@ def role_screen(uid):
             return ui(f'Твоя текущая роль: {role}.\n⏳ Заявка №{request["id"]} уже на рассмотрении модератора. До решения роль не меняется.', [[b('🏠 Назад','home')]])
         return ui(f'Ваша текущая роль: {role}. Чтобы подать заявку на смену роли, обратитесь к модератору.', [
             [b('✉ Написать модератору','role:select')],[b('◀ Назад','home')]])
-    return ui('👋 Привет! Это «Место встречи»!\nЗдесь можно находить интересные мероприятия, знакомиться с единомышленниками и собирать команды для общих идей.\nДля начала расскажи, кто ты.',[
+    return ui('🎯 Место встречи изменить нельзя.\nА вот планы на выходные – очень даже!\nЯ помогу найти мероприятия, единомышленников и команду для твоей следующей большой идеи.\nРасскажи, кто ты, и начнём.',[
         [b('🎒 Я школьник','role:student'),b('👩‍🏫 Я педагог','role:teacher')]])
 
 
@@ -287,10 +287,10 @@ def profile_screen(uid):
     p=me(uid)
     if p and p['role']=='teacher':
         return teacher_screen(uid)
-    if not p: return ui('👤 Моя анкета\nТы ещё не рассказал о себе. Заполни анкету, чтобы находить единомышленников.',[
+    if not p: return ui('🧩 Нужно собрать твою анкету\nПросто расскажи немного о себе – так я смогу искать людей с похожими интересами.',[
         [b('✏️ Заполнить анкету','role:select')],home_btn()])
     if not profiles.complete(uid):
-        return ui('👤 Анкета ещё не заполнена. Добавь город, возраст, интересы и навыки.', [
+        return ui('🧩 Нужно собрать твою анкету\nПросто расскажи немного о себе – так я смогу искать людей с похожими интересами.' if not te.is_moderator(uid) else '👤 Анкета ещё не заполнена. Добавь город, возраст, интересы и навыки.', [
             [b('✏️ Заполнить анкету','profile:edit')], home_btn()])
     visible=bool(people.settings(uid) and people.settings(uid)['visible'])
     text=people.card_text(p)+'\n\n'+('✅ Анкета опубликована.' if visible else '🔒 Анкета скрыта.')
@@ -315,6 +315,10 @@ def tags_screen(uid,kind,group_index=-1):
     text=('🤔Выбери свои интересы. Всего можно отметить до 10 пунктов, поэтому выбирай только самые близкие!' if kind=='interests' else
           '💪Выбери свои навыки. Всего можно отметить до 10 пунктов, поэтому отмечай только самые прокачанные скиллы!')
     text+=' Сейчас у тебя выбраны: '+(', '.join(picked) or ('нет выбранных интересов' if kind=='interests' else 'нет выбранных навыков'))
+    if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid):
+        text=('💡 Выбор интересов\nЧто тебе действительно нравится? Выбирай до 10 направлений. Увлекаться всем на свете не запрещено! (просто здесь нам не хватит кнопок)' if kind=='interests' else
+              '🛠 Выбор навыков\nЧто у тебя получается особенно хорошо? Также до 10 скиллов. Скромность приветствуется, но можно и немного похвастаться!')
+        text+='\nСейчас у тебя выбрано: '+(', '.join(picked) or 'пока ничего')
     if len(picked)>=10:text+='\n'+('Тебя интересует очень многое! Жаль, экран слишком маленький, и ещё больше выбрать не получится' if kind=='interests' else 'Ты столько всего знаешь! Больше уже на экран не поместится!')
     if group_index<0:
         rows=[[b(n,f'tags:{kind}:{i}')] for i,(n,_) in enumerate(groups)]
@@ -336,6 +340,7 @@ def wizard_prompt(uid,field):
 
 
 def event_card(index,uid,mode='card'):
+    student_text=bool(me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid))
     if mode=='favorite':
         ids=fav.ids(uid)
         with connect() as db: found=[db.execute('SELECT * FROM events WHERE id=?',(i,)).fetchone() for i in ids]
@@ -344,9 +349,9 @@ def event_card(index,uid,mode='card'):
     found=[e for e in found if e and e['status']!='hidden']
     if not found:
         if mode=='favorite':return ui('⭐ Здесь пока пусто. Сохраняй интересные мероприятия!',[[b('🎯 Найти мероприятия','card:0')],home_btn()])
-        if mode=='result':return ui('🔎 Пока ничего не найдено. Попробуй другие темы, место или дату.',[
+        if mode=='result':return ui('🕵️ Пока совпадений нет. Но мы же не на контрольной – можно попробовать ещё раз!' if student_text else '🔎 Пока ничего не найдено. Попробуй другие темы, место или дату.',[
             [b('⚙ Фильтры','f:home'),b('✕ Сбросить','f:clear:all')],home_btn()])
-        return ui('📅 Сейчас мероприятий нет. Загляни сюда позже!',[home_btn()])
+        return ui('📭 Афиши пока молчат. Загляни чуть позже – здесь появятся новые события.' if student_text else '📅 Сейчас мероприятий нет. Загляни сюда позже!',[home_btn()])
     index=max(0,min(index,len(found)-1));e=found[index]
     if e['status']=='hidden':
         return ui('Это мероприятие больше недоступно. Давай посмотрим другие!',[[b('🎯 К мероприятиям','card:0')],home_btn()])
@@ -356,7 +361,7 @@ def event_card(index,uid,mode='card'):
     if index<len(found)-1:nav.append(b('Далее ▶',f'{mode}:{index+1}'))
     rows=[[b('✓ В избранном' if fav.saved(uid,e['id']) else '♡ В избранное',f'favtoggle:{e["id"]}:{mode}:{index}'),LinkButton(text='↗ Подробнее',url=e['url'])],
           [b('🏠 В меню','home'),b('⚙ Фильтры','f:home')],nav]
-    if mode=='result' and index==0:text=f'✅ Нашли мероприятия! Подходящих событий: {len(found)}\n\n'+text
+    if mode=='result' and index==0:text=(f'🔎 Нашли для тебя {len(found)} событий: \n\n' if student_text else f'✅ Нашли мероприятия! Подходящих событий: {len(found)}\n\n')+text
     return ui(text,rows)
 
 
@@ -371,13 +376,13 @@ def people_screen(uid,role='student',index=0):
         return ui('👥 Давай найдём единомышленников! Сначала заполни и опубликуй свою анкету. Контакты другим пользователям не показываем.',[
             [profile_button(uid)],home_btn()])
     found=people.list_people(uid,role)
-    if not found:return ui('👥 Пока никого не нашли. Попробуй изменить возраст, интересы или навыки.',[
+    if not found:return ui('🪐 Твои единомышленники пока вне зоны обнаружения. Попробуем другие фильтры?' if current and current['role']=='student' and not te.is_moderator(uid) else '👥 Пока никого не нашли. Попробуй изменить возраст, интересы или навыки.',[
         [b('⚙ Фильтры','p:filters')],home_btn()])
     index=max(0,min(index,len(found)-1));p=found[index]
     nav=[]
     if index:nav.append(b('◀ Назад',f'p:{role}:{index-1}'))
     if index<len(found)-1:nav.append(b('Далее ▶',f'p:{role}:{index+1}'))
-    return ui(people.card_text(p,index,len(found))+'\n\n'+('Хотите связаться?' if me(uid) and me(uid)['role']=='teacher' else 'Хочешь отправить заявку в друзья?'),[
+    return ui(people.card_text(p,index,len(found))+'\n\n'+('Хотите связаться?' if me(uid) and me(uid)['role']=='teacher' else 'Хочешь отправить заявку в друзья?' if te.is_moderator(uid) else '👥 Один в поле воин, но с командой всё-таки веселее. Хочешь добавить пользователя в друзья?\n\n🤝 Хорошие знакомства иногда начинаются с одной кнопки.'),[
         [b('📩 Связаться',f'dm:write:{p["user_id"]}') if me(uid) and me(uid)['role']=='teacher' else b('📩 Отправить заявку',f'req:send:{p["user_id"]}:{role}:{index}')],
         [b('⚙ Фильтры','p:filters'),b('🏠 В меню','home')],
         nav])
@@ -464,7 +469,7 @@ def req_screen(uid,which='in',index=0):
 
 def friends_screen(uid,index=0):
     found=social.friend_list(uid)
-    if not found:return ui('🤝 Здесь пока никого нет. Найди единомышленников и отправь заявку!',[[b('👥 Найти участников','p:student:0')],home_btn()])
+    if not found:return ui('🤝 Тут пока тихо. Но любая крутая команда когда-то состояла из незнакомцев.' if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else '🤝 Здесь пока никого нет. Найди единомышленников и отправь заявку!',[[b('👥 Найти участников','p:student:0')],home_btn()])
     index=max(0,min(index,len(found)-1));p=found[index]
     nav=[]
     if index:nav.append(b('◀ Назад',f'friend:{index-1}'))
@@ -637,6 +642,8 @@ def mod_screen(uid,which='home',page=0):
 
 async def notify(uid, text, attachments=None):
     try:
+        if text=='Не удалось обновить экран. Открой /start для продолжения.' and me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid):
+            text='🔧 Кажется, один винтик решил взять выходной. Не удалось обновить экран. Напиши /start, чтобы продолжить.'
         buttons, revision = versioned_buttons(attachments)
         sent = await api_call('send_message', user_id=uid, text=text[:4000], attachments=buttons)
         mid = sent_id(sent)
@@ -877,12 +884,12 @@ async def dispatch(uid,parts):
                 [b('✅ Да, опубликовать','profile:publish'),b('◀ Назад','profile')]])
         if action=='publish':
             ok=people.publish(uid)
-            return ui('✅ Анкета опубликована!' if ok else 'Сначала заполни анкету.',[
+            return ui(('✅ Анкета опубликована\nТеперь у тебя есть шанс найти единомышленников!' if not te.is_moderator(uid) else '✅ Анкета опубликована!') if ok else 'Сначала заполни анкету.',[
                 [b('👥 Искать участников','p:student:0'),profile_button(uid)]])
         if action=='hideconfirm':return ui('🔒 Скрыть анкету? Новые заявки станут недоступны; друзья сохранятся.',[
             [b('✅ Скрыть','profile:hide'),b('◀ Назад','profile')]])
         if action=='hide':
-            people.hide(uid);return ui('🔒 Анкета скрыта.',[[profile_button(uid)],home_btn()])
+            people.hide(uid);return ui('🔒Анкета скрыта\nМесто встречи тайны не выдаёт. Но ты всё ещё можешь общаться с друзьями и просматривать мероприятия.' if not te.is_moderator(uid) else '🔒 Анкета скрыта.',[[profile_button(uid)],home_btn()])
         if action=='deleteconfirm':return ui('🗑 Удалить анкету? Это действие необратимо.',[
             [b('🗑 Да, удалить','profile:delete'),b('◀ Назад','profile')]])
         if action=='delete':
@@ -976,11 +983,11 @@ async def dispatch(uid,parts):
         if sub=='send':
             target=int(parts[2]);msg=social.request(uid,target)
             if msg.startswith('📩 Заявка отправлена'):queue_notify(target,f'📩 {name(uid)} хочет добавить тебя в друзья!',keyboard([[b('📩 Посмотреть заявки','req:in:0')]]))
-            return ui(msg,[[b('👥 Продолжить поиск',f'p:{parts[3]}:{parts[4]}'),b('📤 Мои заявки','req:out:0')],home_btn()])
+            return ui('📨 Первый шаг сделан. Теперь слово за другой стороной.' if msg.startswith('📩 Заявка отправлена') and me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else msg,[[b('👥 Продолжить поиск',f'p:{parts[3]}:{parts[4]}'),b('📤 Мои заявки','req:out:0')],home_btn()])
         if sub in ('accept','reject'):
             target=int(parts[2]);msg=social.decision(uid,target,sub=='accept')
-            if msg.startswith('🤝'):queue_notify(target,f'🎉 {name(uid)} принял твою заявку! Теперь вы в друзьях.',keyboard([[b('🤝 Друзья','friend:0')]]))
-            elif msg.startswith('✕'):queue_notify(target,f'{name(uid)} не принял твою заявку в друзья',keyboard([home_btn(),[b('👥 Найти людей','p:student:0')]]))
+            if msg.startswith('🤝'):queue_notify(target,f'🎉 Есть контакт! {name(uid)} добавил(-а) вас в друзья.' if me(target) and me(target)['role']=='student' and not te.is_moderator(target) else f'🎉 {name(uid)} принял твою заявку! Теперь вы в друзьях.',keyboard([[b('🤝 Друзья','friend:0')]]))
+            elif msg.startswith('✕'):queue_notify(target,f'{name(uid)} отклонил(-а) твою заявку. Ничего страшного – впереди ещё много знакомств.' if me(target) and me(target)['role']=='student' and not te.is_moderator(target) else f'{name(uid)} не принял твою заявку в друзья',keyboard([home_btn(),[b('👥 Найти людей','p:student:0')]]))
             return ui(msg,[[b('📩 К заявкам','req:in:0'),b('🤝 Друзья','friend:0')],home_btn()])
         if sub=='cancel':
             ok=social.cancel(uid,int(parts[2]));return ui('✅ Заявка отменена.' if ok else 'Заявка уже обработана.',[[b('📤 Мои заявки','req:out:0')],home_btn()])
@@ -1122,7 +1129,7 @@ async def dispatch(uid,parts):
             if not te.resume_rejected(uid,target):return ui('Сначала завершите текущий черновик.',[home_btn()])
             return draft_screen(uid)
     if act=='mod':
-        if not te.is_moderator(uid):return ui('Нет доступа.',[home_btn()])
+        if not te.is_moderator(uid):return ui('🔒 За этой дверью служебная комната. Вернёмся к доступным разделам?' if me(uid) and me(uid)['role']=='student' else 'Нет доступа.',[home_btn()])
         sub=parts[1]
         if sub in ('home','teachers','events','reports','blocks','published','roles'):return mod_screen(uid,sub,int(parts[2]) if sub=='published' and len(parts)>2 else 0)
         if sub=='rolereject':
@@ -1172,7 +1179,7 @@ async def dispatch(uid,parts):
         if sub=='unban':
             with connect() as db:db.execute('DELETE FROM global_blocks WHERE user_id=?',(int(parts[2]),))
             return mod_screen(uid,'blocks')
-    return ui('Кнопка устарела. Вернись в меню.',[home_btn()])
+    return ui('⌛ Эту кнопку мы уже нажимали. Открой актуальное меню через /start.' if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else 'Кнопка устарела. Вернись в меню.',[home_btn()])
 
 
 @dp.message_created(F.message.body.text)
@@ -1189,7 +1196,7 @@ async def text_handler(event):
             profiles.set_field(uid,'city',value)
             text,attachments=wizard_prompt(uid,'age')
         else:
-            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(uid,'Введи корректный возраст от 3 до 100.')
+            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(uid,'🙏Твой возраст прекрасен, но я его немного не понял. Введи целое число от 3 до 100.' if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else 'Введи корректный возраст от 3 до 100.')
             profiles.set_field(uid,'age',int(value))
             text,attachments=wizard_prompt(uid,'interests')
         return await new_screen(uid,text,attachments)
@@ -1213,7 +1220,7 @@ async def text_handler(event):
             chosen=dt.strptime(value,'%d.%m.%y').date()
             flt.update(uid,'period',chosen.isoformat())
         except ValueError:
-            return await new_screen(event.message.sender.user_id, 'Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
+            return await new_screen(event.message.sender.user_id, '📅 Кажется, календарь нас не понял. Введи дату в формате ДД.ММ.ГГ.' if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else 'Твоя дата не соответствует формату. Введи ДД.ММ.ГГ (например, 06.07.27).')
         profiles.set_stage(uid,'')
         text,attachments=flt.screen(uid, 'home')
         return await new_screen(event.message.sender.user_id, text=text,attachments=attachments)
@@ -1256,7 +1263,7 @@ async def text_handler(event):
             if not 1<=len(value)<=70:return await new_screen(event.message.sender.user_id, 'Укажи название города до 70 символов.')
             profiles.set_field(uid,'city',value)
         elif stage=='age':
-            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(event.message.sender.user_id, 'Введи корректный возраст от 3 до 100.')
+            if not value.isdigit() or not 3<=int(value)<=100:return await new_screen(event.message.sender.user_id, '🙏Твой возраст прекрасен, но я его немного не понял. Введи целое число от 3 до 100.' if p and p['role']=='student' and not te.is_moderator(uid) else 'Введи корректный возраст от 3 до 100.')
             profiles.set_field(uid,'age',int(value))
         elif stage.startswith('modteacher_'):
             if not te.is_moderator(uid):return
@@ -1317,7 +1324,7 @@ async def text_handler(event):
         return await new_screen(event.message.sender.user_id, 'Твоё сообщение передано собеседнику. Ждём ответа!',attachments=keyboard([
             [b('✕ Завершить разговор','chat:endconfirm'),b('🚩 Пожаловаться','chat:report')]]))
     text,attachments=menu(uid)
-    await new_screen(event.message.sender.user_id, text='Выбери действие кнопкой.\n'+text,attachments=attachments)
+    await new_screen(event.message.sender.user_id, text='🤔 Такой команды я не знаю. Похоже, нам нужен другой маршрут. Напиши /start.' if me(uid) and me(uid)['role']=='student' and not te.is_moderator(uid) else 'Выбери действие кнопкой.\n'+text,attachments=attachments)
 
 
 if __name__=='__main__':

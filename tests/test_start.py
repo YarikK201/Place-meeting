@@ -17,7 +17,7 @@ class StartTests(NavigationCase):
         await app.bot_started(self.event())
         args=self.transport.send_message.call_args.kwargs
         self.assertEqual(args['user_id'],1)
-        self.assertIn('Привет',args['text'])
+        self.assertIn('🎯 Место встречи изменить нельзя.',args['text'])
         buttons=args['attachments'][0].payload.buttons[0]
         self.assertTrue(buttons[0].payload.endswith(':role:student'))
         self.assertTrue(buttons[1].payload.endswith(':role:teacher'))
@@ -42,15 +42,15 @@ class StartTests(NavigationCase):
     async def test_registered_user_gets_menu(self):
         app.profiles.choose(1,'student')
         await app.bot_started(self.event())
-        self.assertEqual(self.transport.send_message.call_args.kwargs['text'],'🏠 Главное меню')
+        self.assertEqual(self.transport.send_message.call_args.kwargs['text'],'🏠 Приветствуем тебя на Месте встречи! Ну что, какие планы?')
         await app.start(self.command())
-        self.assertEqual(self.transport.edit_message.call_args.kwargs['text'],'🏠 Главное меню')
+        self.assertEqual(self.transport.edit_message.call_args.kwargs['text'],'🏠 Приветствуем тебя на Месте встречи! Ну что, какие планы?')
 
     async def test_start_command_new_user_and_system_event(self):
         await app.start(self.command())
         await app.bot_started(self.event())
         self.transport.send_message.assert_awaited_once()
-        self.assertIn('Привет',self.transport.edit_message.call_args.kwargs['text'])
+        self.assertIn('🎯 Место встречи изменить нельзя.',self.transport.edit_message.call_args.kwargs['text'])
 
     async def test_rapid_start_commands_do_not_duplicate(self):
         await asyncio.gather(app.start(self.command()),app.start(self.command()))
@@ -98,7 +98,7 @@ class StartTests(NavigationCase):
 
     async def test_role_command_new_user(self):
         await app.role_cmd(self.command())
-        self.assertIn('Привет', self.transport.send_message.call_args.kwargs['text'])
+        self.assertIn('🎯 Место встречи изменить нельзя.', self.transport.send_message.call_args.kwargs['text'])
         self.assertIsNone(app.rr.pending_for_user(1))
 
     async def test_role_change_not_in_main_menu(self):

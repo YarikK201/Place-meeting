@@ -10,6 +10,8 @@ from maxapi.types import CallbackButton as B
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from catalog import connect
 import event_tags as et
+import profiles
+import teacher_events as te
 
 GROUPS = {key: value for key, value in et.GROUPS.items() if key != 'age'}
 AGES = et.AGES
@@ -109,7 +111,7 @@ def screen(uid, view='home', param=None):
         def shown(items, default): return ', '.join(items[:2])+(' +'+str(len(items)-2) if len(items)>2 else '') if items else default
         age_names = [AGE_NAMES[AGES.index(x)] for x in s['ages'] if x in AGES]
         date_name = period_label(s['period']) if s['period'] else 'Любая'
-        text = ('🔎 Настроим поиск!\nВыбери нужные параметры.\n\nСейчас выбрано:\n'
+        text = (('⚙️ Подстроим мир под твои интересы. Ну, хотя бы каталог.\n\nСейчас выбрано:\n' if profiles.get(uid) and profiles.get(uid)['role']=='student' and not te.is_moderator(uid) else '🔎 Настроим поиск!\nВыбери нужные параметры.\n\nСейчас выбрано:\n')+
                 f'🎭 Тематика: {shown(s["topics"],"Любая")}\n🎂 Возраст: {shown(age_names,"Любой")}\n'
                 f'📍 Место: {s["city"] or "Весь Кузбасс"}\n📅 Дата: {date_name}\n🌐 Формат: {s["format"] or "Любой"}')
         return text,kb([[btn('🎭 Тематика','topic'),btn('🎂 Возраст','age')],
