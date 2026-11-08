@@ -447,7 +447,7 @@ def req_screen(uid,which='in',index=0):
     found=social.pending(uid,which=='in')
     if not found:
         other='out' if which=='in' else 'in'
-        if social.pending(uid,other):
+        if social.pending(uid,other=='in'):
             return req_screen(uid,other,0)
         return ui('📩 Активных заявок пока нет. Когда появятся новые, здесь будут доступны нужные разделы.',[home_btn()])
     index=max(0,min(index,len(found)-1));r=found[index];peer=r['sender'] if which=='in' else r['recipient']
