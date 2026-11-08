@@ -1,12 +1,16 @@
 # Локальные настройки и ключи
 .env
 .env.*
+!.env.example
 *.cer
 *.key
+*.pem
 
 # Базы и резервные копии
 *.db
 *.db-*
+*.sqlite
+*.sqlite-*
 *backup*
 *before*
 
@@ -22,3 +26,5 @@ venv/
 # Архивы и логи
 *.zip
 *.log
+*.tar
+*.tar.gz

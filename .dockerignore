@@ -28,5 +28,3 @@ attachments/
 *.sqlite-*
 *.tar
 *.tar.gz
-README.txt
-AGENTS.md

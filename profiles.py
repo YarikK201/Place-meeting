@@ -62,30 +62,9 @@ def selection(uid, kind):
     return json.loads(p[kind] or '[]') if p else []
 
 
-def toggle(uid, kind, item):
-    if kind not in ('interests','skills'): return
-    valid = {a for group in (INTERESTS if kind=='interests' else SKILLS).values() for a in group}
-    if item not in valid: return
-    picked=selection(uid,kind)
-    if item in picked: picked.remove(item)
-    elif len(picked)<10: picked.append(item)
-    set_field(uid,kind,picked)
-
-
 def complete(uid):
     p=get(uid)
     return bool(p and p['city'] and p['age'] and selection(uid,'interests') and selection(uid,'skills'))
-
-
-def delete(uid):
-    with connect() as db:
-        db.execute("""UPDATE profiles SET bio='',city='',age=NULL,interests='[]',skills='[]',
-            waiting=1 WHERE user_id=?""",(uid,))
-        db.execute('DELETE FROM user_workflows WHERE user_id=?',(uid,))
-
-# Старый интерфейс API для совместимости.
-def waiting(uid): return stage(uid) in ('city','age','bio')
-def save(uid, bio): set_field(uid,'bio',bio); set_stage(uid,'')
 
 
 def ui_data(uid):

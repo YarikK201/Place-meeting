@@ -1,7 +1,7 @@
 """Одноразовые сообщения, ответы и история последнего сообщения для интерфейса.
 Храним максимум одно последнее сообщение для каждой направленной пары пользователей.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from catalog import connect
 import social
 
@@ -57,11 +57,6 @@ def sent_to(uid):
         return db.execute('''SELECT p.* FROM direct_messages m
             JOIN profiles p ON p.user_id=m.recipient
             WHERE m.sender=? ORDER BY m.sent_at DESC''',(uid,)).fetchall()
-
-
-def clear_pair(a,b):
-    with connect() as db:
-        db.execute('DELETE FROM direct_messages WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?)',(a,b,b,a))
 
 
 def report(reporter,reported,reason):

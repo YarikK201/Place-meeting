@@ -11,7 +11,6 @@ RUN --mount=type=secret,id=build_ca \
       PIP_CERT=/run/secrets/build_ca pip install --no-cache-dir -r requirements.txt; \
     else pip install --no-cache-dir -r requirements.txt; fi
 COPY *.py events.json catalog_legacy_urls.json /app/
-COPY tests/ /app/tests/
 RUN chmod -R a+rX /app && mkdir -p /data && chown 65534:65534 /data
 
 USER 65534:65534

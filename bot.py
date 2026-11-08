@@ -9,7 +9,6 @@ from time import perf_counter, time
 from uuid import uuid4
 from maxapi.exceptions import MaxApiError
 from collections import defaultdict, deque
-from datetime import datetime
 from maxapi import Bot, Dispatcher, F
 from maxapi.types import Command, CallbackButton as B, LinkButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder

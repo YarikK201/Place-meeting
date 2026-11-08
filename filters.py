@@ -83,21 +83,6 @@ def options(title, entries, selected, back='home', multiple=False, clear=None):
     if clear: bottom.append(btn('✕ Очистить','clear:'+clear))
     return title, kb(buttons+[bottom, [btn('◀ Назад',back)]])
 
-def available():
-    # Набор тегов меняется редко. Избегаем повторного json_each на каждом клике.
-    now = time.monotonic()
-    if now - _available_at[0] >= 3.0:
-        with connect() as db:
-            _available_values.clear()
-            _available_values.update(r[0] for r in db.execute(
-                "SELECT DISTINCT value FROM events, json_each(events.tags)"))
-        _available_at[0] = now
-    return _available_values.copy()
-
-_available_at = [float('-inf')]
-_available_values = set()
-
-
 def period_label(value):
     if not value:
         return 'Не выбрана'
@@ -122,7 +107,7 @@ def screen(uid, view='home', param=None):
         return '🎭 Что тебе интересно?', kb([[btn(title,'group:'+key)] for key,(title,_) in GROUPS.items()]+
             [[btn('✅ Готово','home'),btn('✕ Очистить','clear:topics')],[btn('◀ Назад','home')]])
     if view == 'group':
-        title,names=GROUPS[param]; valid=available()
+        title,names=GROUPS[param]
         entries=[(name,name,f'tag:{param}:{i}') for i,name in enumerate(names)]
         return options(title,entries,s['topics'],'topic')
     if view == 'age':
@@ -225,7 +210,6 @@ _cache_epoch = [0]
 
 def invalidate_events():
     _events_at[0] = float('-inf')
-    _available_at[0] = float('-inf')
     _cache_epoch[0] += 1
     _result_cache.clear()
 
