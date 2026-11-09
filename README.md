@@ -177,7 +177,7 @@ SQLite находится в `/data/events_v2.db`. HTTPS использует с
 | `events.json`, `catalog_legacy_urls.json` | Текущие мероприятия и совместимость со старым каталогом |
 | `filters.py`, `event_tags.py`, `presentation.py` | Фильтры, теги и оформление карточек |
 | `Dockerfile`, `compose.yaml` | Сборка и запуск приложения |
-| `requirements.txt`, `constraints.txt` | Библиотеки Python и закреплённые версии |
+| `requirements.txt` | Библиотеки Python и закреплённые версии |
 | `.env.example` | Образец локальных настроек |
 | `.github/workflows/publish-image.yml` | Технические проверки и публикация образа в GHCR |
 
